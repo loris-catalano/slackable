@@ -79,7 +79,7 @@ export const QuickProfileCard = () => {
   const getStatusColor = () => {
     if (!profile) return "bg-gray-400";
     switch (profile.status) {
-      case "active":
+      case "online":
         return "bg-green-500";
       case "away":
         return "bg-yellow-500";

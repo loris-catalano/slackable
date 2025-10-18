@@ -30,10 +30,18 @@ export const QuickProfileCard = () => {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      fetchProfile();
-    }
-  }, [open]);
+    fetchProfile();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        fetchProfile();
+      } else if (event === 'SIGNED_OUT') {
+        setProfile(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const fetchProfile = async () => {
     try {

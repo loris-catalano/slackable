@@ -5,6 +5,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { WorkspaceSelector } from "@/components/workspace/WorkspaceSelector";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
+import { DMWindow } from "@/components/dm/DMWindow";
 import { User } from "@supabase/supabase-js";
 
 const Index = () => {
@@ -13,7 +14,9 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const [workspacesLoading, setWorkspacesLoading] = useState(true);
   const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"channel" | "dm">("channel");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -87,8 +90,21 @@ const Index = () => {
     }
   };
 
+  const handleSelectChannel = (channelId: string) => {
+    setCurrentChannelId(channelId);
+    setCurrentConversationId(null);
+    setViewMode("channel");
+  };
+
+  const handleSelectConversation = (conversationId: string) => {
+    setCurrentConversationId(conversationId);
+    setCurrentChannelId(null);
+    setViewMode("dm");
+  };
+
   const handleLogout = async () => {
     setCurrentChannelId(null);
+    setCurrentConversationId(null);
     await supabase.auth.signOut();
   };
 
@@ -125,18 +141,22 @@ const Index = () => {
       <Sidebar
         workspaceId={currentWorkspaceId!}
         currentChannelId={currentChannelId}
-        onSelectChannel={setCurrentChannelId}
+        currentConversationId={currentConversationId}
+        onSelectChannel={handleSelectChannel}
+        onSelectConversation={handleSelectConversation}
         onLogout={handleLogout}
       />
       {isTransitioning || channelsLoading ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
-      ) : currentChannelId ? (
+      ) : viewMode === "channel" && currentChannelId ? (
         <ChatWindow channelId={currentChannelId} />
+      ) : viewMode === "dm" && currentConversationId ? (
+        <DMWindow conversationId={currentConversationId} />
       ) : (
         <div className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground">Select a channel to start messaging</p>
+          <p className="text-muted-foreground">Select a channel or conversation to start messaging</p>
         </div>
       )}
     </div>

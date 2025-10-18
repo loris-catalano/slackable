@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Hash, Plus, LogOut } from "lucide-react";
+import { Hash, Plus, LogOut, MessageSquare } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { InviteWorkspaceDialog } from "@/components/workspace/InviteWorkspaceDialog";
 import { QuickProfileCard } from "@/components/profile/QuickProfileCard";
 import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher";
+import { DMList } from "@/components/dm/DMList";
+import { NewDMDialog } from "@/components/dm/NewDMDialog";
 
 interface Channel {
   id: string;
@@ -25,11 +28,13 @@ interface Profile {
 interface SidebarProps {
   workspaceId: string;
   currentChannelId: string | null;
+  currentConversationId: string | null;
   onSelectChannel: (channelId: string) => void;
+  onSelectConversation: (conversationId: string) => void;
   onLogout: () => void;
 }
 
-export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogout }: SidebarProps) => {
+export const Sidebar = ({ workspaceId, currentChannelId, currentConversationId, onSelectChannel, onSelectConversation, onLogout }: SidebarProps) => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -37,6 +42,7 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
   const [newChannelDesc, setNewChannelDesc] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isNewDMOpen, setIsNewDMOpen] = useState(false);
 
   useEffect(() => {
     setIsLoading(true);
@@ -152,71 +158,101 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
         <InviteWorkspaceDialog workspaceId={workspaceId} workspaceName={workspaceName} />
       </div>
 
-      <ScrollArea className="flex-1">
-        {isLoading ? (
-          <div className="p-4 space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
-            ))}
-          </div>
-        ) : (
-          <div className="p-4 space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Channels</h3>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-5 w-5">
-                      <Plus className="h-3 w-3" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Create Channel</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="channel-name">Channel Name</Label>
-                        <Input
-                          id="channel-name"
-                          placeholder="project-updates"
-                          value={newChannelName}
-                          onChange={(e) => setNewChannelName(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="channel-desc">Description (optional)</Label>
-                        <Input
-                          id="channel-desc"
-                          placeholder="Project updates and announcements"
-                          value={newChannelDesc}
-                          onChange={(e) => setNewChannelDesc(e.target.value)}
-                        />
-                      </div>
-                      <Button onClick={createChannel} className="w-full">
-                        Create Channel
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="space-y-1">
-                {channels.map((channel) => (
-                  <Button
-                    key={channel.id}
-                    variant={currentChannelId === channel.id ? "secondary" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => onSelectChannel(channel.id)}
-                  >
-                    <Hash className="mr-2 h-4 w-4" />
-                    {channel.name}
-                  </Button>
+      <Tabs defaultValue="channels" className="flex-1 flex flex-col">
+        <TabsList className="mx-4 mt-2">
+          <TabsTrigger value="channels" className="flex-1">
+            <Hash className="mr-2 h-4 w-4" />
+            Channels
+          </TabsTrigger>
+          <TabsTrigger value="dms" className="flex-1">
+            <MessageSquare className="mr-2 h-4 w-4" />
+            DMs
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="channels" className="flex-1 mt-0">
+          <ScrollArea className="h-full">
+            {isLoading ? (
+              <div className="p-4 space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-10 animate-pulse rounded bg-muted" />
                 ))}
               </div>
-            </div>
-          </div>
-        )}
-      </ScrollArea>
+            ) : (
+              <div className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold">Channels</h3>
+                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-5 w-5">
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Create Channel</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="channel-name">Channel Name</Label>
+                            <Input
+                              id="channel-name"
+                              placeholder="project-updates"
+                              value={newChannelName}
+                              onChange={(e) => setNewChannelName(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="channel-desc">Description (optional)</Label>
+                            <Input
+                              id="channel-desc"
+                              placeholder="Project updates and announcements"
+                              value={newChannelDesc}
+                              onChange={(e) => setNewChannelDesc(e.target.value)}
+                            />
+                          </div>
+                          <Button onClick={createChannel} className="w-full">
+                            Create Channel
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  <div className="space-y-1">
+                    {channels.map((channel) => (
+                      <Button
+                        key={channel.id}
+                        variant={currentChannelId === channel.id ? "secondary" : "ghost"}
+                        className="w-full justify-start"
+                        onClick={() => onSelectChannel(channel.id)}
+                      >
+                        <Hash className="mr-2 h-4 w-4" />
+                        {channel.name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="dms" className="flex-1 mt-0">
+          <DMList
+            onSelectConversation={onSelectConversation}
+            onNewDM={() => setIsNewDMOpen(true)}
+            selectedConversationId={currentConversationId}
+          />
+        </TabsContent>
+      </Tabs>
+
+      <NewDMDialog
+        open={isNewDMOpen}
+        onOpenChange={setIsNewDMOpen}
+        onConversationCreated={onSelectConversation}
+        workspaceId={workspaceId}
+      />
 
       <div className="border-t border-sidebar-border p-4 space-y-2">
         {profile ? (

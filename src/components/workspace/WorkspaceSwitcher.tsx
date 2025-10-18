@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -24,6 +25,25 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [ownedWorkspaceIds, setOwnedWorkspaceIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const fetchOwnership = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("user_id", user.id)
+        .eq("role", "admin");
+
+      if (data) {
+        setOwnedWorkspaceIds(new Set(data.map(m => m.workspace_id)));
+      }
+    };
+    fetchOwnership();
+  }, [workspaces]);
 
   const handleSwitchWorkspace = async (workspaceId: string) => {
     if (workspaceId === currentWorkspaceId) return;
@@ -88,8 +108,13 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
               onClick={() => handleSwitchWorkspace(workspace.id)}
               className={currentWorkspaceId === workspace.id ? "bg-accent" : ""}
             >
-              <div className="flex flex-col">
-                <span className="font-medium">{workspace.name}</span>
+              <div className="flex flex-col flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{workspace.name}</span>
+                  {ownedWorkspaceIds.has(workspace.id) && (
+                    <Badge variant="secondary" className="text-xs">Owner</Badge>
+                  )}
+                </div>
                 <span className="text-xs text-muted-foreground">{workspace.slug}</span>
               </div>
             </DropdownMenuItem>

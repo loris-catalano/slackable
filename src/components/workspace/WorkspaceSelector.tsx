@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,10 +23,27 @@ export const WorkspaceSelector = ({ onSelectWorkspace }: WorkspaceSelectorProps)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [ownedWorkspaceIds, setOwnedWorkspaceIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchWorkspaces();
+    fetchOwnership();
   }, []);
+
+  const fetchOwnership = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", user.id)
+      .eq("role", "admin");
+
+    if (data) {
+      setOwnedWorkspaceIds(new Set(data.map(m => m.workspace_id)));
+    }
+  };
 
   const fetchWorkspaces = async () => {
     const { data, error } = await supabase
@@ -88,8 +106,13 @@ export const WorkspaceSelector = ({ onSelectWorkspace }: WorkspaceSelectorProps)
               className="h-auto justify-start p-4 text-left"
               onClick={() => onSelectWorkspace(workspace.id)}
             >
-              <div>
-                <div className="font-semibold">{workspace.name}</div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="font-semibold">{workspace.name}</div>
+                  {ownedWorkspaceIds.has(workspace.id) && (
+                    <Badge variant="secondary" className="text-xs">Owner</Badge>
+                  )}
+                </div>
                 <div className="text-sm text-muted-foreground">{workspace.slug}</div>
               </div>
             </Button>

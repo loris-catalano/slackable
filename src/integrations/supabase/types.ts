@@ -187,6 +187,38 @@ export type Database = {
           },
         ]
       }
+      dm_reactions: {
+        Row: {
+          created_at: string
+          dm_id: string
+          emoji: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dm_id: string
+          emoji: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dm_id?: string
+          emoji?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dm_reactions_dm_id_fkey"
+            columns: ["dm_id"]
+            isOneToOne: false
+            referencedRelation: "direct_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string

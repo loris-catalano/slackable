@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send, Users } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { DMReactions } from "./DMReactions";
 
 interface Message {
   id: string;
@@ -294,6 +295,9 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
                 </span>
               </div>
               <p className="text-sm mt-1 break-words whitespace-pre-wrap">{message.content}</p>
+              {currentUserId && (
+                <DMReactions dmId={message.id} currentUserId={currentUserId} />
+              )}
             </div>
           </div>
         ))}

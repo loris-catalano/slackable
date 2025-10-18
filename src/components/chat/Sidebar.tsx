@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { ShareWorkspaceDialog } from "@/components/workspace/ShareWorkspaceDialog";
+import { InviteWorkspaceDialog } from "@/components/workspace/InviteWorkspaceDialog";
 import { QuickProfileCard } from "@/components/profile/QuickProfileCard";
 import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher";
 
@@ -149,7 +149,7 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
       </div>
 
       <div className="border-b border-sidebar-border p-4">
-        <ShareWorkspaceDialog workspaceId={workspaceId} workspaceName={workspaceName} />
+        <InviteWorkspaceDialog workspaceId={workspaceId} workspaceName={workspaceName} />
       </div>
 
       <ScrollArea className="flex-1">

@@ -1,0 +1,251 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "resend";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+interface InviteRequest {
+  workspaceId: string;
+  emails: string[];
+}
+
+const handler = async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    
+    // Get the authenticated user
+    const authHeader = req.headers.get("Authorization")!;
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error("Authentication error:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    const { workspaceId, emails }: InviteRequest = await req.json();
+
+    if (!workspaceId || !emails || emails.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Get workspace details
+    const { data: workspace, error: workspaceError } = await supabase
+      .from("workspaces")
+      .select("name, slug")
+      .eq("id", workspaceId)
+      .single();
+
+    if (workspaceError || !workspace) {
+      console.error("Workspace error:", workspaceError);
+      return new Response(
+        JSON.stringify({ error: "Workspace not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Get inviter's profile
+    const { data: inviterProfile } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .single();
+
+    const inviterName = inviterProfile?.display_name || user.email?.split("@")[0] || "A colleague";
+
+    const results = [];
+
+    for (const email of emails) {
+      try {
+        // Generate unique token
+        const token = crypto.randomUUID();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiration
+
+        // Check if invite already exists
+        const { data: existingInvite } = await supabase
+          .from("workspace_invites")
+          .select("id, status")
+          .eq("workspace_id", workspaceId)
+          .eq("email", email)
+          .eq("status", "pending")
+          .maybeSingle();
+
+        let inviteToken = token;
+
+        if (existingInvite) {
+          // Update existing invite
+          const { error: updateError } = await supabase
+            .from("workspace_invites")
+            .update({
+              token: token,
+              expires_at: expiresAt.toISOString(),
+              invited_by_user_id: user.id,
+            })
+            .eq("id", existingInvite.id);
+
+          if (updateError) {
+            console.error(`Error updating invite for ${email}:`, updateError);
+            results.push({ email, success: false, error: "Failed to update invite" });
+            continue;
+          }
+        } else {
+          // Create new invite
+          const { error: insertError } = await supabase
+            .from("workspace_invites")
+            .insert({
+              workspace_id: workspaceId,
+              email,
+              invited_by_user_id: user.id,
+              token,
+              expires_at: expiresAt.toISOString(),
+            });
+
+          if (insertError) {
+            console.error(`Error creating invite for ${email}:`, insertError);
+            results.push({ email, success: false, error: "Failed to create invite" });
+            continue;
+          }
+        }
+
+        // Create invite link
+        const inviteLink = `${req.headers.get("origin") || "https://app.lovable.app"}/invite/${inviteToken}`;
+
+        // Send email
+        const emailResponse = await resend.emails.send({
+          from: "Workspace Invites <onboarding@resend.dev>",
+          to: [email],
+          subject: `${inviterName} invited you to join ${workspace.name}`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                  body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                  }
+                  .container {
+                    background-color: #f9fafb;
+                    border-radius: 8px;
+                    padding: 32px;
+                  }
+                  .header {
+                    text-align: center;
+                    margin-bottom: 32px;
+                  }
+                  .header h1 {
+                    color: #111827;
+                    margin: 0;
+                    font-size: 24px;
+                  }
+                  .content {
+                    background-color: white;
+                    border-radius: 8px;
+                    padding: 24px;
+                    margin-bottom: 24px;
+                  }
+                  .button {
+                    display: inline-block;
+                    background-color: #2563eb;
+                    color: white;
+                    padding: 12px 32px;
+                    text-decoration: none;
+                    border-radius: 6px;
+                    font-weight: 600;
+                    margin: 16px 0;
+                  }
+                  .button:hover {
+                    background-color: #1d4ed8;
+                  }
+                  .footer {
+                    text-align: center;
+                    color: #6b7280;
+                    font-size: 14px;
+                  }
+                  .workspace-name {
+                    font-weight: 600;
+                    color: #2563eb;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <h1>🎉 You've been invited!</h1>
+                  </div>
+                  <div class="content">
+                    <p>Hi there,</p>
+                    <p>
+                      <strong>${inviterName}</strong> has invited you to join the workspace 
+                      <span class="workspace-name">${workspace.name}</span>.
+                    </p>
+                    <p>
+                      Join your team to start collaborating, share messages, and stay connected.
+                    </p>
+                    <div style="text-align: center; margin: 32px 0;">
+                      <a href="${inviteLink}" class="button">Join Workspace</a>
+                    </div>
+                    <p style="font-size: 14px; color: #6b7280;">
+                      Or copy and paste this link into your browser:<br>
+                      <code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 12px; word-break: break-all;">
+                        ${inviteLink}
+                      </code>
+                    </p>
+                  </div>
+                  <div class="footer">
+                    <p>This invitation will expire on ${expiresAt.toLocaleDateString()}.</p>
+                    <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+                  </div>
+                </div>
+              </body>
+            </html>
+          `,
+        });
+
+        console.log(`Email sent to ${email}:`, emailResponse);
+        results.push({ email, success: true });
+      } catch (error) {
+        console.error(`Error processing invite for ${email}:`, error);
+        results.push({ email, success: false, error: error.message });
+      }
+    }
+
+    return new Response(JSON.stringify({ results }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
+  } catch (error: any) {
+    console.error("Error in send-workspace-invite function:", error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  }
+};
+
+serve(handler);

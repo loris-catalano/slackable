@@ -31,23 +31,8 @@ export default function AcceptInvite() {
         return;
       }
 
-      // Fetch invite details
+      // Fetch invite details with workspace name using a join
       const { data: inviteData, error: inviteError } = await supabase
-        .from("workspace_invites")
-        .select("id, workspace_id, email, expires_at, status")
-        .eq("token", token)
-        .maybeSingle();
-
-      if (inviteError || !inviteData) {
-        console.error("Invite fetch error:", inviteError);
-        setError("Invitation not found");
-        setLoading(false);
-        return;
-      }
-
-      // Fetch workspace details using public access (RLS allows viewing by invite token)
-      // We'll get the workspace name from the invite join query instead
-      const { data: fullInviteData } = await supabase
         .from("workspace_invites")
         .select(`
           id,
@@ -63,13 +48,12 @@ export default function AcceptInvite() {
         .eq("token", token)
         .maybeSingle();
 
-      const workspaceData = fullInviteData?.workspaces || { name: "Unknown Workspace", slug: "" };
-
-      // Combine the data
-      const completeInvite = {
-        ...inviteData,
-        workspaces: workspaceData || { name: "Unknown Workspace", slug: "" }
-      };
+      if (inviteError || !inviteData) {
+        console.error("Invite fetch error:", inviteError);
+        setError("Invitation not found");
+        setLoading(false);
+        return;
+      }
 
       // Check if invite is expired
       if (new Date(inviteData.expires_at) < new Date()) {
@@ -79,17 +63,17 @@ export default function AcceptInvite() {
       }
 
       // Check if already accepted
-      if (completeInvite.status === "accepted") {
+      if (inviteData.status === "accepted") {
         setError("This invitation has already been used");
         setLoading(false);
         return;
       }
 
-      setInvite(completeInvite);
+      setInvite(inviteData);
 
       // If user is authenticated and email matches, auto-accept
-      if (user && user.email === completeInvite.email) {
-        await acceptInvite(completeInvite);
+      if (user && user.email === inviteData.email) {
+        await acceptInvite(inviteData);
       }
 
       setLoading(false);

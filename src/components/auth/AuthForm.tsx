@@ -52,7 +52,7 @@ export const AuthForm = () => {
     <div className="w-full max-w-md space-y-6 rounded-2xl border-2 border-border/50 bg-card p-8 shadow-2xl animate-fade-in">
       <div className="space-y-3 text-center">
         <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          Welcome to Stackable
+          Welcome to Slackable
         </h1>
         <p className="text-muted-foreground text-base">
           {isSignUp ? "Create your account and start collaborating" : "Sign in to your workspace"}

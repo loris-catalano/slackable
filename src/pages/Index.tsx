@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { AuthForm } from "@/components/auth/AuthForm";
 import { WorkspaceSelector } from "@/components/workspace/WorkspaceSelector";
 import { Sidebar } from "@/components/chat/Sidebar";
@@ -7,9 +8,9 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import { User } from "@supabase/supabase-js";
 
 const Index = () => {
+  const { currentWorkspaceId, setCurrentWorkspaceId, workspaces } = useWorkspace();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -28,18 +29,24 @@ const Index = () => {
   }, []);
 
   useEffect(() => {
-    if (workspaceId) {
+    if (user && workspaces.length > 0 && !currentWorkspaceId) {
+      setCurrentWorkspaceId(workspaces[0].id);
+    }
+  }, [user, workspaces, currentWorkspaceId, setCurrentWorkspaceId]);
+
+  useEffect(() => {
+    if (currentWorkspaceId) {
       fetchDefaultChannel();
     }
-  }, [workspaceId]);
+  }, [currentWorkspaceId]);
 
   const fetchDefaultChannel = async () => {
-    if (!workspaceId) return;
+    if (!currentWorkspaceId) return;
 
     const { data } = await supabase
       .from("channels")
       .select("id")
-      .eq("workspace_id", workspaceId)
+      .eq("workspace_id", currentWorkspaceId)
       .order("created_at")
       .limit(1)
       .single();
@@ -59,7 +66,7 @@ const Index = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setWorkspaceId(null);
+    setCurrentWorkspaceId(null);
     setCurrentChannelId(null);
   };
 
@@ -79,14 +86,14 @@ const Index = () => {
     );
   }
 
-  if (!workspaceId) {
-    return <WorkspaceSelector onSelectWorkspace={setWorkspaceId} />;
+  if (!currentWorkspaceId || workspaces.length === 0) {
+    return <WorkspaceSelector onSelectWorkspace={setCurrentWorkspaceId} />;
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
-        workspaceId={workspaceId}
+        workspaceId={currentWorkspaceId}
         currentChannelId={currentChannelId}
         onSelectChannel={setCurrentChannelId}
         onLogout={handleLogout}

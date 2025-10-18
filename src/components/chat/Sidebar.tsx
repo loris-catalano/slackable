@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ShareWorkspaceDialog } from "@/components/workspace/ShareWorkspaceDialog";
 import { QuickProfileCard } from "@/components/profile/QuickProfileCard";
+import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher";
 
 interface Channel {
   id: string;
@@ -134,8 +135,11 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
 
   return (
     <div className="flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="border-b border-sidebar-border p-4 space-y-2">
-        <h2 className="text-lg font-semibold">{workspaceName || "Workspace"}</h2>
+      <div className="border-b border-sidebar-border">
+        <WorkspaceSwitcher currentWorkspaceName={workspaceName || "Workspace"} />
+      </div>
+
+      <div className="border-b border-sidebar-border p-4">
         <ShareWorkspaceDialog workspaceId={workspaceId} workspaceName={workspaceName} />
       </div>
 

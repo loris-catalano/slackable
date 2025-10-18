@@ -425,7 +425,7 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-screen">
       {/* Incoming Call Dialog */}
       {incomingCall && (
         <IncomingCallDialog
@@ -516,8 +516,8 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
       <div className="p-4 border-t">
         <div className="flex gap-2">
           <div className="flex gap-1">
-            <ImageUploader onImageSelect={handleImageSelect} />
-            <AudioRecorder onSendAudio={handleAudioSend} />
+            <ImageUploader onImageSelect={handleImageSelect} disabled={false} />
+            <AudioRecorder onSendAudio={handleAudioSend} disabled={false} />
           </div>
           <Input
             value={newMessage}

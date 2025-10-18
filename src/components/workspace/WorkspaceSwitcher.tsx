@@ -208,33 +208,34 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
           workspaceId={leaveWorkspaceId}
           workspaceName={leaveWorkspaceName}
           onWorkspaceLeft={async () => {
+            const wasCurrentWorkspace = leaveWorkspaceId === currentWorkspaceId;
             setLeaveWorkspaceId(null);
             
-            // Reload workspaces to get updated list
+            // Reload workspaces first
             await loadWorkspaces();
             
-            // Check if user still has workspaces
+            // Get fresh workspace list
             const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              const { data: remainingWorkspaces } = await supabase
-                .from("workspace_members")
-                .select("workspace_id, workspaces(id, name)")
-                .eq("user_id", user.id);
+            if (!user) return;
 
-              if (!remainingWorkspaces || remainingWorkspaces.length === 0) {
-                // No workspaces left, redirect to home (will show WorkspaceSelector)
-                setCurrentWorkspaceId(null);
-                window.location.href = "/";
-              } else if (leaveWorkspaceId === currentWorkspaceId) {
-                // Left current workspace, switch to first available
-                setIsTransitioning(true);
-                const firstWorkspace = remainingWorkspaces[0].workspaces;
-                if (firstWorkspace) {
-                  setCurrentWorkspaceId(firstWorkspace.id);
-                  await new Promise(resolve => setTimeout(resolve, 100));
-                }
+            const { data: remainingWorkspaces } = await supabase
+              .from("workspaces")
+              .select("id, name")
+              .order("created_at", { ascending: false });
+
+            if (!remainingWorkspaces || remainingWorkspaces.length === 0) {
+              // No workspaces left - clear current and force redirect
+              setCurrentWorkspaceId(null);
+              setIsTransitioning(true);
+              window.location.href = "/";
+            } else if (wasCurrentWorkspace) {
+              // Left current workspace - switch to first available
+              setIsTransitioning(true);
+              setCurrentWorkspaceId(remainingWorkspaces[0].id);
+              setTimeout(() => {
                 setIsTransitioning(false);
-              }
+                window.location.reload();
+              }, 100);
             }
           }}
         />

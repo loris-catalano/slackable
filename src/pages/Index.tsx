@@ -11,6 +11,7 @@ const Index = () => {
   const { currentWorkspaceId, setCurrentWorkspaceId, workspaces, isTransitioning } = useWorkspace();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [workspacesLoading, setWorkspacesLoading] = useState(true);
   const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
 
@@ -18,20 +19,38 @@ const Index = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      if (!session?.user) {
+        setWorkspacesLoading(false);
+      }
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (!session?.user) {
+        setWorkspacesLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
+    if (user && workspaces.length === 0) {
+      setWorkspacesLoading(true);
+    } else if (user && workspaces.length > 0) {
+      setWorkspacesLoading(false);
+    }
+  }, [user, workspaces]);
+
+  useEffect(() => {
     if (user && workspaces.length > 0 && !currentWorkspaceId) {
-      setCurrentWorkspaceId(workspaces[0].id);
+      const lastWorkspaceId = localStorage.getItem("currentWorkspaceId");
+      const targetWorkspace = lastWorkspaceId && workspaces.find(w => w.id === lastWorkspaceId)
+        ? lastWorkspaceId
+        : workspaces[0].id;
+      setCurrentWorkspaceId(targetWorkspace);
     }
   }, [user, workspaces, currentWorkspaceId, setCurrentWorkspaceId]);
 
@@ -73,7 +92,7 @@ const Index = () => {
     await supabase.auth.signOut();
   };
 
-  if (loading) {
+  if (loading || (user && workspacesLoading)) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -89,11 +108,11 @@ const Index = () => {
     );
   }
 
-  if (!currentWorkspaceId && workspaces.length === 0 && !loading) {
+  if (workspaces.length === 0) {
     return <WorkspaceSelector onSelectWorkspace={setCurrentWorkspaceId} />;
   }
 
-  if (!currentWorkspaceId && workspaces.length > 0) {
+  if (!currentWorkspaceId) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />

@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { MessageReactions } from "./MessageReactions";
+import { MediaMessage } from "./MediaMessage";
 
 interface Message {
   id: string;
@@ -14,6 +15,8 @@ interface Message {
   user_display_name?: string | null;
   user_email?: string;
   user_avatar_url?: string | null;
+  attachment_type?: string | null;
+  attachment_url?: string | null;
 }
 
 interface MessageListProps {
@@ -72,7 +75,7 @@ export const MessageList = ({ channelId, targetMessageId }: MessageListProps) =>
   const fetchMessages = async () => {
     const { data } = await supabase
       .from("messages")
-      .select("*")
+      .select("id, content, created_at, edited, user_id, attachment_type, attachment_url")
       .eq("channel_id", channelId)
       .order("created_at", { ascending: true });
 
@@ -168,6 +171,14 @@ export const MessageList = ({ channelId, targetMessageId }: MessageListProps) =>
                 <p className="mt-1 text-foreground whitespace-pre-wrap break-words">
                   {message.content}
                 </p>
+                {message.attachment_type && message.attachment_url && (
+                  <div className="mt-2">
+                    <MediaMessage
+                      type={message.attachment_type as "image" | "audio"}
+                      url={message.attachment_url}
+                    />
+                  </div>
+                )}
                 {currentUserId && (
                   <MessageReactions 
                     messageId={message.id} 

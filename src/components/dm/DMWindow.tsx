@@ -7,6 +7,9 @@ import { Send, Users } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { DMReactions } from "./DMReactions";
+import { AudioRecorder } from "../chat/AudioRecorder";
+import { ImageUploader } from "../chat/ImageUploader";
+import { MediaMessage } from "../chat/MediaMessage";
 
 interface Message {
   id: string;
@@ -14,6 +17,8 @@ interface Message {
   user_id: string;
   created_at: string;
   edited: boolean;
+  attachment_type?: string | null;
+  attachment_url?: string | null;
   profiles: {
     id: string;
     display_name: string;
@@ -152,7 +157,7 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
     try {
       const { data: messagesData, error } = await supabase
         .from("direct_messages")
-        .select("id, content, user_id, created_at, edited")
+        .select("id, content, user_id, created_at, edited, attachment_type, attachment_url")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
 
@@ -199,8 +204,28 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !currentUserId) return;
+  const uploadFile = async (file: Blob, type: "audio" | "image"): Promise<string> => {
+    if (!currentUserId) throw new Error("Not authenticated");
+
+    const bucket = type === "audio" ? "chat-audio" : "chat-images";
+    const fileExt = type === "audio" ? "webm" : "jpg";
+    const fileName = `${currentUserId}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(fileName, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  };
+
+  const sendMessage = async (attachmentType?: string, attachmentUrl?: string) => {
+    if ((!newMessage.trim() && !attachmentUrl) || !currentUserId) return;
 
     try {
       // Extract mentions (@username)
@@ -216,8 +241,10 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
         .insert({
           conversation_id: conversationId,
           user_id: currentUserId,
-          content: newMessage,
-          mentions: mentions.length > 0 ? mentions : []
+          content: newMessage.trim() || (attachmentType === "image" ? "📷 Image" : "🎤 Audio message"),
+          mentions: mentions.length > 0 ? mentions : [],
+          attachment_type: attachmentType,
+          attachment_url: attachmentUrl,
         });
 
       if (error) throw error;
@@ -226,6 +253,26 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
     } catch (error: any) {
       console.error("Error sending message:", error);
       toast.error("Failed to send message");
+    }
+  };
+
+  const handleAudioSend = async (audioBlob: Blob) => {
+    try {
+      const url = await uploadFile(audioBlob, "audio");
+      await sendMessage("audio", url);
+      toast.success("Audio message sent");
+    } catch (error: any) {
+      toast.error("Failed to send audio: " + error.message);
+    }
+  };
+
+  const handleImageSelect = async (file: File) => {
+    try {
+      const url = await uploadFile(file, "image");
+      await sendMessage("image", url);
+      toast.success("Image sent");
+    } catch (error: any) {
+      toast.error("Failed to send image: " + error.message);
     }
   };
 
@@ -295,6 +342,14 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
                 </span>
               </div>
               <p className="text-sm mt-1 break-words whitespace-pre-wrap">{message.content}</p>
+              {message.attachment_type && message.attachment_url && (
+                <div className="mt-2">
+                  <MediaMessage
+                    type={message.attachment_type as "image" | "audio"}
+                    url={message.attachment_url}
+                  />
+                </div>
+              )}
               {currentUserId && (
                 <DMReactions dmId={message.id} currentUserId={currentUserId} />
               )}
@@ -307,6 +362,10 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
       {/* Input */}
       <div className="p-4 border-t">
         <div className="flex gap-2">
+          <div className="flex gap-1">
+            <ImageUploader onImageSelect={handleImageSelect} />
+            <AudioRecorder onSendAudio={handleAudioSend} />
+          </div>
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
@@ -314,7 +373,7 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
             placeholder={`Message ${conversationName}`}
             className="flex-1"
           />
-          <Button onClick={sendMessage} size="icon">
+          <Button onClick={() => sendMessage()} size="icon">
             <Send className="h-4 w-4" />
           </Button>
         </div>

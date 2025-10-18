@@ -27,6 +27,27 @@ export const ChatWindow = ({ channelId }: ChatWindowProps) => {
 
   useEffect(() => {
     fetchChannel();
+
+    // Subscribe to realtime updates for this channel
+    const channel = supabase
+      .channel(`channel-${channelId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'channels',
+          filter: `id=eq.${channelId}`,
+        },
+        (payload) => {
+          setChannel(payload.new as Channel);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [channelId]);
 
   const fetchChannel = async () => {

@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
+import { MessageReactions } from "./MessageReactions";
 
 interface Message {
   id: string;
@@ -21,7 +22,19 @@ interface MessageListProps {
 
 export const MessageList = ({ channelId }: MessageListProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    getCurrentUser();
+  }, []);
+
+  const getCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setCurrentUserId(user.id);
+    }
+  };
 
   useEffect(() => {
     fetchMessages();
@@ -127,6 +140,12 @@ export const MessageList = ({ channelId }: MessageListProps) => {
                 <p className="mt-1 text-foreground whitespace-pre-wrap break-words">
                   {message.content}
                 </p>
+                {currentUserId && (
+                  <MessageReactions 
+                    messageId={message.id} 
+                    currentUserId={currentUserId}
+                  />
+                )}
               </div>
             </div>
           </div>

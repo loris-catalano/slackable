@@ -21,6 +21,15 @@ export const MessageInput = ({ channelId }: MessageInputProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Ensure membership in public channels (ignore errors and duplicates)
+      try {
+        await supabase
+          .from("channel_members")
+          .insert([{ channel_id: channelId, user_id: user.id }]);
+      } catch (_) {
+        // ignore RLS/duplicate errors
+      }
+
       const { error } = await supabase.from("messages").insert({
         channel_id: channelId,
         user_id: user.id,

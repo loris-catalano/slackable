@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 interface Channel {
   name: string;
   description: string | null;
+  is_private: boolean;
 }
 
 interface ChatWindowProps {
@@ -24,8 +25,10 @@ interface ChatWindowProps {
 export const ChatWindow = ({ channelId }: ChatWindowProps) => {
   const [channel, setChannel] = useState<Channel | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [membershipReady, setMembershipReady] = useState(false);
 
   useEffect(() => {
+    setMembershipReady(false);
     fetchChannel();
 
     // Subscribe to realtime updates for this channel
@@ -50,10 +53,31 @@ export const ChatWindow = ({ channelId }: ChatWindowProps) => {
     };
   }, [channelId]);
 
+  useEffect(() => {
+    const ensure = async () => {
+      if (!channel) {
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setMembershipReady(true);
+        return;
+      }
+      if (!channel.is_private) {
+        const { error: cmError } = await supabase
+          .from('channel_members')
+          .insert([{ channel_id: channelId, user_id: user.id }]);
+        // Ignore errors (e.g., already a member or private channel)
+      }
+      setMembershipReady(true);
+    };
+    ensure();
+  }, [channelId, channel]);
+
   const fetchChannel = async () => {
     const { data } = await supabase
       .from("channels")
-      .select("name, description")
+      .select("name, description, is_private")
       .eq("id", channelId)
       .single();
 
@@ -93,8 +117,8 @@ export const ChatWindow = ({ channelId }: ChatWindowProps) => {
           </DropdownMenu>
         </div>
       </div>
-      <MessageList channelId={channelId} />
-      <MessageInput channelId={channelId} />
+      {membershipReady && <MessageList channelId={channelId} />}
+      {membershipReady && <MessageInput channelId={channelId} />}
       <ChannelDetailsDrawer
         channelId={channelId}
         open={detailsOpen}

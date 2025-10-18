@@ -40,6 +40,8 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
 
   useEffect(() => {
     setIsLoading(true);
+    setProfile(null);
+    setWorkspaceName("");
     Promise.all([
       fetchChannels(),
       fetchProfile(),
@@ -217,7 +219,11 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
       </ScrollArea>
 
       <div className="border-t border-sidebar-border p-4 space-y-2">
-        <QuickProfileCard />
+        {profile ? (
+          <QuickProfileCard />
+        ) : (
+          <div className="h-10 animate-pulse rounded bg-muted" />
+        )}
         <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign Out

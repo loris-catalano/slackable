@@ -69,9 +69,8 @@ const Index = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    setCurrentWorkspaceId(null);
     setCurrentChannelId(null);
+    await supabase.auth.signOut();
   };
 
   if (loading) {

@@ -8,6 +8,7 @@ interface WorkspaceContextType {
   loadWorkspaces: () => Promise<void>;
   isTransitioning: boolean;
   setIsTransitioning: (value: boolean) => void;
+  resetWorkspaceData: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -36,6 +37,12 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
   }, [currentWorkspaceId]);
 
   const loadWorkspaces = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setWorkspaces([]);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("workspaces")
       .select("*")
@@ -46,8 +53,25 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const resetWorkspaceData = () => {
+    setCurrentWorkspaceId(null);
+    setWorkspaces([]);
+    setIsTransitioning(false);
+    localStorage.removeItem("currentWorkspaceId");
+  };
+
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        loadWorkspaces();
+      } else if (event === 'SIGNED_OUT') {
+        resetWorkspaceData();
+      }
+    });
+
     loadWorkspaces();
+
+    return () => subscription.unsubscribe();
   }, []);
 
   return (
@@ -59,6 +83,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         loadWorkspaces,
         isTransitioning,
         setIsTransitioning,
+        resetWorkspaceData,
       }}
     >
       {children}

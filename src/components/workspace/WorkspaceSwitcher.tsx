@@ -12,9 +12,10 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { WorkspaceSettingsDialog } from "./WorkspaceSettingsDialog";
 
 interface WorkspaceSwitcherProps {
   currentWorkspaceName: string;
@@ -26,6 +27,8 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [ownedWorkspaceIds, setOwnedWorkspaceIds] = useState<Set<string>>(new Set());
+  const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null);
+  const [settingsWorkspaceName, setSettingsWorkspaceName] = useState("");
 
   useEffect(() => {
     const fetchOwnership = async () => {
@@ -121,6 +124,20 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
                 </div>
                 <span className="text-xs opacity-70">{workspace.slug}</span>
               </div>
+              {ownedWorkspaceIds.has(workspace.id) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSettingsWorkspaceId(workspace.id);
+                    setSettingsWorkspaceName(workspace.name);
+                  }}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+              )}
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
@@ -153,6 +170,16 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
           </div>
         </DialogContent>
       </Dialog>
+
+      {settingsWorkspaceId && (
+        <WorkspaceSettingsDialog
+          open={!!settingsWorkspaceId}
+          onOpenChange={(open) => !open && setSettingsWorkspaceId(null)}
+          workspaceId={settingsWorkspaceId}
+          workspaceName={settingsWorkspaceName}
+          onWorkspaceUpdated={loadWorkspaces}
+        />
+      )}
     </>
   );
 };

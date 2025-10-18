@@ -11,9 +11,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Brevo sender configuration (set these in secrets for best deliverability)
-const brevoSenderName = Deno.env.get("BREVO_SENDER_NAME") || "Workspace Invites";
-const brevoSenderEmail = Deno.env.get("BREVO_SENDER_EMAIL") || "melcat648@gmail.com";
+// Brevo sender configuration - MUST be set in secrets for deliverability
+const brevoSenderName = Deno.env.get("BREVO_SENDER_NAME");
+const brevoSenderEmail = Deno.env.get("BREVO_SENDER_EMAIL");
+
+if (!brevoSenderName || !brevoSenderEmail) {
+  console.error("BREVO_SENDER_NAME and BREVO_SENDER_EMAIL must be set in secrets");
+}
 
 interface InviteRequest {
   workspaceId: string;
@@ -239,6 +243,21 @@ const handler = async (req: Request): Promise<Response> => {
                 </body>
               </html>
             `,
+            textContent: `
+You've been invited!
+
+Hi there,
+
+${inviterName} has invited you to join the workspace ${workspace.name}.
+
+Join your team to start collaborating, share messages, and stay connected.
+
+Click here to join: ${inviteLink}
+
+This invitation will expire on ${expiresAt.toLocaleDateString()}.
+
+If you didn't expect this invitation, you can safely ignore this email.
+            `.trim(),
           }),
         });
 

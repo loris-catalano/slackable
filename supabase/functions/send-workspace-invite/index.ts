@@ -11,6 +11,10 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Brevo sender configuration (set these in secrets for best deliverability)
+const brevoSenderName = Deno.env.get("BREVO_SENDER_NAME") || "Workspace Invites";
+const brevoSenderEmail = Deno.env.get("BREVO_SENDER_EMAIL") || "noreply@yourdomain.com";
+
 interface InviteRequest {
   workspaceId: string;
   emails: string[];
@@ -129,6 +133,7 @@ const handler = async (req: Request): Promise<Response> => {
         const inviteLink = `${req.headers.get("origin") || "https://app.lovable.app"}/invite/${inviteToken}`;
 
         // Send email via Brevo
+        console.log("Brevo: sending invite", { email, workspace: workspace.name, inviteLink });
         const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
           method: "POST",
           headers: {
@@ -138,8 +143,8 @@ const handler = async (req: Request): Promise<Response> => {
           },
           body: JSON.stringify({
             sender: {
-              name: "Workspace Invites",
-              email: "noreply@yourdomain.com",
+              name: brevoSenderName,
+              email: brevoSenderEmail,
             },
             to: [{ email }],
             subject: `${inviterName} invited you to join ${workspace.name}`,
@@ -237,15 +242,17 @@ const handler = async (req: Request): Promise<Response> => {
           }),
         });
 
+        const responseText = await emailResponse.text();
+        let responseData: any = null;
+        try { responseData = JSON.parse(responseText); } catch (_) {}
+
         if (!emailResponse.ok) {
-          const errorData = await emailResponse.json();
-          console.error(`Brevo API error for ${email}:`, errorData);
+          console.error(`Brevo API error for ${email}:`, responseData ?? responseText);
           results.push({ email, success: false, error: "Failed to send email" });
           continue;
         }
 
-        const responseData = await emailResponse.json();
-        console.log(`Email sent to ${email}:`, responseData);
+        console.log(`Brevo email sent to ${email}:`, responseData ?? responseText);
         results.push({ email, success: true });
       } catch (error) {
         console.error(`Error processing invite for ${email}:`, error);

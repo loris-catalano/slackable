@@ -6,6 +6,8 @@ interface WorkspaceContextType {
   setCurrentWorkspaceId: (id: string | null) => void;
   workspaces: Array<{ id: string; name: string; slug: string }>;
   loadWorkspaces: () => Promise<void>;
+  isTransitioning: boolean;
+  setIsTransitioning: (value: boolean) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
@@ -23,6 +25,7 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
     () => localStorage.getItem("currentWorkspaceId")
   );
   const [workspaces, setWorkspaces] = useState<Array<{ id: string; name: string; slug: string }>>([]);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
     if (currentWorkspaceId) {
@@ -54,6 +57,8 @@ export const WorkspaceProvider = ({ children }: { children: ReactNode }) => {
         setCurrentWorkspaceId,
         workspaces,
         loadWorkspaces,
+        isTransitioning,
+        setIsTransitioning,
       }}
     >
       {children}

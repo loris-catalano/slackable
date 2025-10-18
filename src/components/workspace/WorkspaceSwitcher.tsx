@@ -20,14 +20,20 @@ interface WorkspaceSwitcherProps {
 }
 
 export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherProps) => {
-  const { currentWorkspaceId, setCurrentWorkspaceId, workspaces, loadWorkspaces } = useWorkspace();
+  const { currentWorkspaceId, setCurrentWorkspaceId, workspaces, loadWorkspaces, setIsTransitioning } = useWorkspace();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  const handleSwitchWorkspace = (workspaceId: string) => {
+  const handleSwitchWorkspace = async (workspaceId: string) => {
+    if (workspaceId === currentWorkspaceId) return;
+    
+    setIsTransitioning(true);
     setCurrentWorkspaceId(workspaceId);
-    window.location.reload();
+    
+    // Small delay to ensure state updates
+    await new Promise(resolve => setTimeout(resolve, 100));
+    setIsTransitioning(false);
   };
 
   const createWorkspace = async () => {
@@ -52,8 +58,10 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
       setIsCreateOpen(false);
       setNewWorkspaceName("");
       await loadWorkspaces();
+      setIsTransitioning(true);
       setCurrentWorkspaceId(workspaceId);
-      window.location.reload();
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setIsTransitioning(false);
     } catch (error: any) {
       toast.error(error.message);
     } finally {

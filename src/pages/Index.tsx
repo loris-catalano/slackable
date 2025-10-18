@@ -8,10 +8,11 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import { User } from "@supabase/supabase-js";
 
 const Index = () => {
-  const { currentWorkspaceId, setCurrentWorkspaceId, workspaces } = useWorkspace();
+  const { currentWorkspaceId, setCurrentWorkspaceId, workspaces, isTransitioning } = useWorkspace();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentChannelId, setCurrentChannelId] = useState<string | null>(null);
+  const [channelsLoading, setChannelsLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -36,7 +37,10 @@ const Index = () => {
 
   useEffect(() => {
     if (currentWorkspaceId) {
-      fetchDefaultChannel();
+      setChannelsLoading(true);
+      fetchDefaultChannel().finally(() => {
+        setChannelsLoading(false);
+      });
     }
   }, [currentWorkspaceId]);
 
@@ -86,19 +90,31 @@ const Index = () => {
     );
   }
 
-  if (!currentWorkspaceId || workspaces.length === 0) {
+  if (!currentWorkspaceId && workspaces.length === 0 && !loading) {
     return <WorkspaceSelector onSelectWorkspace={setCurrentWorkspaceId} />;
+  }
+
+  if (!currentWorkspaceId && workspaces.length > 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar
-        workspaceId={currentWorkspaceId}
+        workspaceId={currentWorkspaceId!}
         currentChannelId={currentChannelId}
         onSelectChannel={setCurrentChannelId}
         onLogout={handleLogout}
       />
-      {currentChannelId ? (
+      {isTransitioning || channelsLoading ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      ) : currentChannelId ? (
         <ChatWindow channelId={currentChannelId} />
       ) : (
         <div className="flex flex-1 items-center justify-center">

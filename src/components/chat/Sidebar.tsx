@@ -36,12 +36,19 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelDesc, setNewChannelDesc] = useState("");
   const [workspaceName, setWorkspaceName] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchChannels();
-    fetchProfile();
-    fetchWorkspaceName();
-    subscribeToChannels();
+    setIsLoading(true);
+    Promise.all([
+      fetchChannels(),
+      fetchProfile(),
+      fetchWorkspaceName()
+    ]).finally(() => {
+      setIsLoading(false);
+    });
+    const unsubscribe = subscribeToChannels();
+    return unsubscribe;
   }, [workspaceId]);
 
   const fetchChannels = async () => {
@@ -144,61 +151,69 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Channels</h3>
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-5 w-5">
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create Channel</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="channel-name">Channel Name</Label>
-                      <Input
-                        id="channel-name"
-                        placeholder="project-updates"
-                        value={newChannelName}
-                        onChange={(e) => setNewChannelName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="channel-desc">Description (optional)</Label>
-                      <Input
-                        id="channel-desc"
-                        placeholder="Project updates and announcements"
-                        value={newChannelDesc}
-                        onChange={(e) => setNewChannelDesc(e.target.value)}
-                      />
-                    </div>
-                    <Button onClick={createChannel} className="w-full">
-                      Create Channel
+        {isLoading ? (
+          <div className="p-4 space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+            ))}
+          </div>
+        ) : (
+          <div className="p-4 space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">Channels</h3>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-5 w-5">
+                      <Plus className="h-3 w-3" />
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-            <div className="space-y-1">
-              {channels.map((channel) => (
-                <Button
-                  key={channel.id}
-                  variant={currentChannelId === channel.id ? "secondary" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => onSelectChannel(channel.id)}
-                >
-                  <Hash className="mr-2 h-4 w-4" />
-                  {channel.name}
-                </Button>
-              ))}
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Channel</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="channel-name">Channel Name</Label>
+                        <Input
+                          id="channel-name"
+                          placeholder="project-updates"
+                          value={newChannelName}
+                          onChange={(e) => setNewChannelName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="channel-desc">Description (optional)</Label>
+                        <Input
+                          id="channel-desc"
+                          placeholder="Project updates and announcements"
+                          value={newChannelDesc}
+                          onChange={(e) => setNewChannelDesc(e.target.value)}
+                        />
+                      </div>
+                      <Button onClick={createChannel} className="w-full">
+                        Create Channel
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+              <div className="space-y-1">
+                {channels.map((channel) => (
+                  <Button
+                    key={channel.id}
+                    variant={currentChannelId === channel.id ? "secondary" : "ghost"}
+                    className="w-full justify-start"
+                    onClick={() => onSelectChannel(channel.id)}
+                  >
+                    <Hash className="mr-2 h-4 w-4" />
+                    {channel.name}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </ScrollArea>
 
       <div className="border-t border-sidebar-border p-4 space-y-2">

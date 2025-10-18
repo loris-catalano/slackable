@@ -132,15 +132,22 @@ const Index = () => {
 
   if (loading || (user && workspacesLoading)) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/30 to-background">
+        <div className="text-center space-y-4 animate-fade-in">
+          <div className="relative">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary mx-auto" />
+            <div className="absolute inset-0 h-12 w-12 animate-pulse rounded-full bg-primary/20 mx-auto" />
+          </div>
+          <p className="text-sm text-muted-foreground">Loading your workspace...</p>
+        </div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-muted">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-accent/5 to-background relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 animate-pulse-glow" />
         <AuthForm />
       </div>
     );
@@ -153,13 +160,16 @@ const Index = () => {
   if (!currentWorkspaceId) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div className="relative">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+          <div className="absolute inset-0 h-12 w-12 animate-pulse rounded-full bg-primary/20" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-background via-muted/20 to-background">
       <Sidebar
         workspaceId={currentWorkspaceId!}
         currentChannelId={currentChannelId}
@@ -170,15 +180,28 @@ const Index = () => {
       />
       {isTransitioning || channelsLoading ? (
         <div className="flex flex-1 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <div className="text-center space-y-4 animate-fade-in">
+            <div className="relative mx-auto">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+              <div className="absolute inset-0 h-12 w-12 animate-pulse rounded-full bg-primary/20" />
+            </div>
+            <p className="text-sm text-muted-foreground">Loading messages...</p>
+          </div>
         </div>
       ) : viewMode === "channel" && currentChannelId ? (
-        <ChatWindow channelId={currentChannelId} targetMessageId={targetMessageId} />
+        <div className="flex-1 animate-fade-in">
+          <ChatWindow channelId={currentChannelId} targetMessageId={targetMessageId} />
+        </div>
       ) : viewMode === "dm" && currentConversationId ? (
-        <DMWindow conversationId={currentConversationId} targetMessageId={targetMessageId} />
+        <div className="flex-1 animate-fade-in">
+          <DMWindow conversationId={currentConversationId} targetMessageId={targetMessageId} />
+        </div>
       ) : (
         <div className="flex flex-1 items-center justify-center">
-          <p className="text-muted-foreground">Select a channel or conversation to start messaging</p>
+          <div className="text-center space-y-3 animate-fade-in">
+            <p className="text-lg text-muted-foreground">Select a channel or conversation to start messaging</p>
+            <p className="text-sm text-muted-foreground/70">Choose from the sidebar to begin</p>
+          </div>
         </div>
       )}
     </div>

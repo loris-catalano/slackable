@@ -34,6 +34,7 @@ export const WorkspaceSelector = ({ onSelectWorkspace }: WorkspaceSelectorProps)
       .order("created_at", { ascending: false });
 
     if (error) {
+      console.error("Error loading workspaces:", error);
       toast.error("Failed to load workspaces");
       return;
     }

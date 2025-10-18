@@ -115,7 +115,8 @@ export const ChannelDetailsDrawer = ({
       .eq("channel_id", channelId);
 
     if (error) {
-      toast({ title: "Error loading members", variant: "destructive" });
+      console.error("Error loading members:", error);
+      setMembers([]);
       return;
     }
 
@@ -264,33 +265,43 @@ export const ChannelDetailsDrawer = ({
           </TabsContent>
 
           <TabsContent value="members" className="space-y-2 mt-4">
-            {members.map((member) => (
-              <div
-                key={member.id}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-muted"
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={member.avatar_url || undefined} />
-                    <AvatarFallback>
-                      {member.display_name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">{member.display_name}</p>
+            {members.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                You're the only member in this channel
+              </p>
+            ) : members.length === 1 && members[0].user_id === currentUserId ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                You're the only member in this channel
+              </p>
+            ) : (
+              members.map((member) => (
+                <div
+                  key={member.id}
+                  className="flex items-center justify-between p-2 rounded-lg hover:bg-muted"
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={member.avatar_url || undefined} />
+                      <AvatarFallback>
+                        {member.display_name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{member.display_name}</p>
+                    </div>
                   </div>
+                  {isAdmin && member.user_id !== currentUserId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveMember(member.id, member.user_id)}
+                    >
+                      <UserX className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                {isAdmin && member.user_id !== currentUserId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveMember(member.id, member.user_id)}
-                  >
-                    <UserX className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            ))}
+              ))
+            )}
           </TabsContent>
 
           {isAdmin && (

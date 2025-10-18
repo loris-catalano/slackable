@@ -18,13 +18,7 @@ interface Conversation {
     display_name: string;
     avatar_url: string | null;
   };
-  members?: Array<{
-    profiles: {
-      id: string;
-      display_name: string;
-      avatar_url: string | null;
-    };
-  }>;
+  member_count?: number;
 }
 
 interface WorkspaceMember {
@@ -92,7 +86,6 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
 
       setCurrentUserId(user.id);
 
-      // Load conversations and members in parallel
       await Promise.all([loadConversations(user.id), loadWorkspaceMembers(user.id)]);
     } catch (error: any) {
       console.error("Error loading data:", error);
@@ -103,36 +96,35 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
   };
 
   const loadConversations = async (userId: string) => {
-    // Get all conversations user is part of
-    const { data: convData, error: convError } = await supabase
+    // Get user's conversation memberships
+    const { data: userConvs, error: userConvsError } = await supabase
+      .from("conversation_members")
+      .select("conversation_id, last_read_at")
+      .eq("user_id", userId);
+
+    if (userConvsError) throw userConvsError;
+    if (!userConvs || userConvs.length === 0) {
+      setConversations([]);
+      return;
+    }
+
+    const conversationIds = userConvs.map(c => c.conversation_id);
+
+    // Get conversations data
+    const { data: convsData, error: convsError } = await supabase
       .from("conversations")
-      .select(`
-        id,
-        name,
-        is_group,
-        last_message_at,
-        conversation_members!inner(
-          user_id,
-          last_read_at,
-          profiles(id, display_name, avatar_url)
-        )
-      `)
+      .select("id, name, is_group, last_message_at")
+      .in("id", conversationIds)
       .order("last_message_at", { ascending: false, nullsFirst: false });
 
-    if (convError) throw convError;
+    if (convsError) throw convsError;
 
-    // Process conversations to add unread counts and user info
+    // Process each conversation
     const processedConversations = await Promise.all(
-      (convData || []).map(async (conv: any) => {
+      (convsData || []).map(async (conv: any) => {
         // Get unread count
-        const { data: unreadData } = await supabase
-          .from("conversation_members")
-          .select("last_read_at")
-          .eq("conversation_id", conv.id)
-          .eq("user_id", userId)
-          .single();
-
-        const lastReadAt = unreadData?.last_read_at;
+        const userConv = userConvs.find(uc => uc.conversation_id === conv.id);
+        const lastReadAt = userConv?.last_read_at;
 
         let unreadCount = 0;
         if (lastReadAt) {
@@ -142,7 +134,6 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
             .eq("conversation_id", conv.id)
             .gt("created_at", lastReadAt)
             .neq("user_id", userId);
-
           unreadCount = count || 0;
         } else {
           const { count } = await supabase
@@ -150,22 +141,29 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
             .select("*", { count: 'exact', head: true })
             .eq("conversation_id", conv.id)
             .neq("user_id", userId);
-
           unreadCount = count || 0;
         }
 
-        // For 1:1 chats, get the other user
+        // Get conversation members
+        const { data: members } = await supabase
+          .from("conversation_members")
+          .select("user_id")
+          .eq("conversation_id", conv.id);
+
+        // For 1:1 chats, get the other user's profile
         let otherUser;
-        if (!conv.is_group) {
-          const otherMember = conv.conversation_members.find(
-            (m: any) => m.user_id !== userId
-          );
-          if (otherMember?.profiles) {
-            otherUser = {
-              id: otherMember.profiles.id,
-              display_name: otherMember.profiles.display_name,
-              avatar_url: otherMember.profiles.avatar_url
-            };
+        if (!conv.is_group && members && members.length === 2) {
+          const otherUserId = members.find(m => m.user_id !== userId)?.user_id;
+          if (otherUserId) {
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("id, display_name, avatar_url")
+              .eq("id", otherUserId)
+              .single();
+            
+            if (profile) {
+              otherUser = profile;
+            }
           }
         }
 
@@ -176,7 +174,7 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
           last_message_at: conv.last_message_at,
           unread_count: unreadCount,
           other_user: otherUser,
-          members: conv.conversation_members
+          member_count: members?.length || 0
         };
       })
     );
@@ -185,19 +183,30 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
   };
 
   const loadWorkspaceMembers = async (userId: string) => {
-    // Get all workspace members except current user
-    const { data: membersData, error } = await supabase
+    // Get workspace members
+    const { data: workspaceMembers, error: membersError } = await supabase
       .from("workspace_members")
-      .select(`
-        user_id,
-        profiles(id, display_name, avatar_url, email)
-      `)
+      .select("user_id")
       .eq("workspace_id", workspaceId)
       .neq("user_id", userId);
 
-    if (error) throw error;
+    if (membersError) throw membersError;
+    if (!workspaceMembers || workspaceMembers.length === 0) {
+      setMembers([]);
+      return;
+    }
 
-    // Get all 1:1 conversation user IDs
+    const memberUserIds = workspaceMembers.map(m => m.user_id);
+
+    // Get profiles for all members
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url, email")
+      .in("id", memberUserIds);
+
+    if (profilesError) throw profilesError;
+
+    // Get existing 1:1 conversations
     const { data: existingConvs } = await supabase
       .from("conversation_members")
       .select("conversation_id")
@@ -212,7 +221,7 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
           .select("user_id, conversations!inner(is_group)")
           .eq("conversation_id", conv.conversation_id);
 
-        if (members && members.length === 2) {
+        if (members && members.length === 2 && !(members[0] as any).conversations.is_group) {
           const otherMember = members.find(m => m.user_id !== userId);
           if (otherMember) {
             conversationUserIds.add(otherMember.user_id);
@@ -221,17 +230,15 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
       }
     }
 
-    const membersList = membersData
-      ?.map((m: any) => ({
-        id: m.profiles.id,
-        display_name: m.profiles.display_name,
-        avatar_url: m.profiles.avatar_url,
-        email: m.profiles.email,
-        has_conversation: conversationUserIds.has(m.profiles.id)
-      }))
-      .filter(Boolean) as WorkspaceMember[];
+    const membersList = (profiles || []).map(profile => ({
+      id: profile.id,
+      display_name: profile.display_name,
+      avatar_url: profile.avatar_url,
+      email: profile.email,
+      has_conversation: conversationUserIds.has(profile.id)
+    }));
 
-    setMembers(membersList || []);
+    setMembers(membersList);
   };
 
   const startDirectMessage = async (memberId: string) => {
@@ -254,6 +261,7 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
           if (
             members &&
             members.length === 2 &&
+            !(members[0] as any).conversations.is_group &&
             members.some(m => m.user_id === memberId)
           ) {
             onSelectConversation(conv.conversation_id);
@@ -319,7 +327,6 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
   }
 
   const activeConversations = conversations.filter(c => c.last_message_at);
-  const membersWithoutConversation = members.filter(m => !m.has_conversation);
 
   return (
     <div className="flex flex-col h-full">
@@ -371,7 +378,7 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, 
                   </div>
                   {conv.is_group && (
                     <p className="text-xs text-muted-foreground truncate">
-                      {conv.members?.length || 0} members
+                      {conv.member_count} members
                     </p>
                   )}
                 </div>

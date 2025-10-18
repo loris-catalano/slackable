@@ -12,10 +12,11 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronDown, Plus, Settings } from "lucide-react";
+import { ChevronDown, Plus, Settings, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { WorkspaceSettingsDialog } from "./WorkspaceSettingsDialog";
+import { LeaveWorkspaceDialog } from "./LeaveWorkspaceDialog";
 
 interface WorkspaceSwitcherProps {
   currentWorkspaceName: string;
@@ -29,6 +30,8 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
   const [ownedWorkspaceIds, setOwnedWorkspaceIds] = useState<Set<string>>(new Set());
   const [settingsWorkspaceId, setSettingsWorkspaceId] = useState<string | null>(null);
   const [settingsWorkspaceName, setSettingsWorkspaceName] = useState("");
+  const [leaveWorkspaceId, setLeaveWorkspaceId] = useState<string | null>(null);
+  const [leaveWorkspaceName, setLeaveWorkspaceName] = useState("");
 
   useEffect(() => {
     const fetchOwnership = async () => {
@@ -104,42 +107,59 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
             <ChevronDown className="ml-2 h-4 w-4 shrink-0" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
-          {workspaces.map((workspace) => (
-            <DropdownMenuItem
-              key={workspace.id}
-              onClick={() => handleSwitchWorkspace(workspace.id)}
-              className={
-                currentWorkspaceId === workspace.id 
-                  ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
-                  : "bg-background text-foreground hover:bg-primary hover:text-primary-foreground"
-              }
-            >
-              <div className="flex flex-col flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{workspace.name}</span>
-                  {ownedWorkspaceIds.has(workspace.id) && (
-                    <Badge variant="secondary" className="text-xs">Owner</Badge>
-                  )}
+        <DropdownMenuContent align="start" className="w-64 bg-background">
+          {workspaces.map((workspace) => {
+            const isOwner = ownedWorkspaceIds.has(workspace.id);
+            
+            return (
+              <DropdownMenuItem
+                key={workspace.id}
+                onClick={() => handleSwitchWorkspace(workspace.id)}
+                className={
+                  currentWorkspaceId === workspace.id 
+                    ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
+                    : "bg-background text-foreground hover:bg-primary hover:text-primary-foreground"
+                }
+              >
+                <div className="flex flex-col flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{workspace.name}</span>
+                    {isOwner && (
+                      <Badge variant="secondary" className="text-xs">Owner</Badge>
+                    )}
+                  </div>
+                  <span className="text-xs opacity-70">{workspace.slug}</span>
                 </div>
-                <span className="text-xs opacity-70">{workspace.slug}</span>
-              </div>
-              {ownedWorkspaceIds.has(workspace.id) && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSettingsWorkspaceId(workspace.id);
-                    setSettingsWorkspaceName(workspace.name);
-                  }}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              )}
-            </DropdownMenuItem>
-          ))}
+                {isOwner ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSettingsWorkspaceId(workspace.id);
+                      setSettingsWorkspaceName(workspace.name);
+                    }}
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLeaveWorkspaceId(workspace.id);
+                      setLeaveWorkspaceName(workspace.name);
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </Button>
+                )}
+              </DropdownMenuItem>
+            );
+          })}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => setIsCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
@@ -178,6 +198,22 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
           workspaceId={settingsWorkspaceId}
           workspaceName={settingsWorkspaceName}
           onWorkspaceUpdated={loadWorkspaces}
+        />
+      )}
+
+      {leaveWorkspaceId && (
+        <LeaveWorkspaceDialog
+          open={!!leaveWorkspaceId}
+          onOpenChange={(open) => !open && setLeaveWorkspaceId(null)}
+          workspaceId={leaveWorkspaceId}
+          workspaceName={leaveWorkspaceName}
+          onWorkspaceLeft={async () => {
+            await loadWorkspaces();
+            // If leaving current workspace, redirect
+            if (leaveWorkspaceId === currentWorkspaceId) {
+              window.location.href = "/";
+            }
+          }}
         />
       )}
     </>

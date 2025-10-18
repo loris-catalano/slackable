@@ -160,12 +160,12 @@ export const Sidebar = ({ workspaceId, currentChannelId, currentConversationId, 
   };
 
   return (
-    <div className="flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground shadow-xl">
-      <div className="border-b border-sidebar-border/50 bg-white/10 backdrop-blur-sm">
+    <div className="flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
+      <div className="border-b border-sidebar-border">
         <WorkspaceSwitcher currentWorkspaceName={workspaceName || "Workspace"} />
       </div>
 
-      <div className="border-b border-sidebar-border/50 p-4 bg-white/5">
+      <div className="border-b border-sidebar-border p-4">
         <InviteWorkspaceDialog workspaceId={workspaceId} workspaceName={workspaceName} />
       </div>
 
@@ -277,18 +277,13 @@ export const Sidebar = ({ workspaceId, currentChannelId, currentConversationId, 
         workspaceId={workspaceId}
       />
 
-      <div className="border-t border-sidebar-border/50 p-4 space-y-2 bg-white/5 backdrop-blur-sm">
+      <div className="border-t border-sidebar-border p-4 space-y-2">
         {profile ? (
           <QuickProfileCard />
         ) : (
-          <div className="h-10 animate-pulse rounded-lg bg-white/10" />
+          <div className="h-10 animate-pulse rounded bg-muted" />
         )}
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="w-full justify-start hover:bg-white/10 transition-all duration-200" 
-          onClick={onLogout}
-        >
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign Out
         </Button>

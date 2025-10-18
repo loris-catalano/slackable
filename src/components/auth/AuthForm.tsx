@@ -49,13 +49,11 @@ export const AuthForm = () => {
   };
 
   return (
-    <div className="w-full max-w-md space-y-6 rounded-2xl border-2 border-border/50 bg-card p-8 shadow-2xl animate-fade-in">
-      <div className="space-y-3 text-center">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          Welcome to Slackable
-        </h1>
-        <p className="text-muted-foreground text-base">
-          {isSignUp ? "Create your account and start collaborating" : "Sign in to your workspace"}
+    <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8 shadow-lg">
+      <div className="space-y-2 text-center">
+        <h1 className="text-3xl font-bold">Welcome to Stackable</h1>
+        <p className="text-muted-foreground">
+          {isSignUp ? "Create your account" : "Sign in to your workspace"}
         </p>
       </div>
 

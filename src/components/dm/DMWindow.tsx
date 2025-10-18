@@ -3,13 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Send, Users } from "lucide-react";
+import { Send, Users, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { DMReactions } from "./DMReactions";
 import { AudioRecorder } from "../chat/AudioRecorder";
 import { ImageUploader } from "../chat/ImageUploader";
 import { MediaMessage } from "../chat/MediaMessage";
+import { CallInterface } from "./CallInterface";
+import { IncomingCallDialog } from "./IncomingCallDialog";
 
 interface Message {
   id: string;
@@ -43,6 +45,9 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [conversationName, setConversationName] = useState("");
+  const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  const [activeCall, setActiveCall] = useState<{ id: string; isInitiator: boolean } | null>(null);
+  const [incomingCall, setIncomingCall] = useState<{ id: string; callerId: string; callerName: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -50,6 +55,7 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
     loadConversation();
     loadMessages();
     setupRealtimeSubscription();
+    setupCallSubscription();
     markAsRead();
 
     return () => {
@@ -80,6 +86,65 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
         }, 2000);
       }
     }
+  };
+
+  const setupCallSubscription = () => {
+    const channel = supabase
+      .channel(`calls-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'calls',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        async (payload) => {
+          const call = payload.new;
+          
+          // If receiving a call
+          if (call.receiver_id === currentUserId && call.status === 'ringing') {
+            // Get caller info
+            const { data: callerData } = await supabase
+              .from("profiles")
+              .select("display_name")
+              .eq("id", call.caller_id)
+              .single();
+            
+            setIncomingCall({
+              id: call.id,
+              callerId: call.caller_id,
+              callerName: callerData?.display_name || "Unknown User"
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'calls',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const call = payload.new;
+          
+          // If call ended
+          if (call.status === 'ended') {
+            setActiveCall(null);
+            setIncomingCall(null);
+          } else if (call.status === 'active' && call.caller_id === currentUserId) {
+            // Caller side: call was accepted
+            setIncomingCall(null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   };
 
   const setupRealtimeSubscription = () => {
@@ -121,8 +186,6 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
 
       if (convError) throw convError;
 
-      setConversation(convData);
-
       // Get conversation members
       const { data: membersData, error: membersError } = await supabase
         .from("conversation_members")
@@ -130,6 +193,12 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
         .eq("conversation_id", conversationId);
 
       if (membersError) throw membersError;
+
+      setConversation(convData);
+
+      // Get the other user ID for 1:1 chats
+      const otherMemberId = membersData?.find(m => m.user_id !== user.id)?.user_id;
+      setOtherUserId(otherMemberId || null);
 
       // Set conversation name
       if (convData.is_group) {
@@ -276,6 +345,64 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
     }
   };
 
+  const startCall = async () => {
+    if (!currentUserId || !otherUserId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("calls")
+        .insert({
+          conversation_id: conversationId,
+          caller_id: currentUserId,
+          receiver_id: otherUserId,
+          status: "ringing",
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setActiveCall({ id: data.id, isInitiator: true });
+      toast.success("Calling...");
+    } catch (error: any) {
+      console.error("Error starting call:", error);
+      toast.error("Failed to start call");
+    }
+  };
+
+  const acceptCall = async () => {
+    if (!incomingCall) return;
+
+    try {
+      await supabase
+        .from("calls")
+        .update({ status: "active" })
+        .eq("id", incomingCall.id);
+
+      setActiveCall({ id: incomingCall.id, isInitiator: false });
+      setIncomingCall(null);
+    } catch (error: any) {
+      console.error("Error accepting call:", error);
+      toast.error("Failed to accept call");
+    }
+  };
+
+  const declineCall = async () => {
+    if (!incomingCall) return;
+
+    try {
+      await supabase
+        .from("calls")
+        .update({ status: "ended", ended_at: new Date().toISOString() })
+        .eq("id", incomingCall.id);
+
+      setIncomingCall(null);
+    } catch (error: any) {
+      console.error("Error declining call:", error);
+      toast.error("Failed to decline call");
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -299,9 +426,30 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
 
   return (
     <div className="flex flex-col h-full">
+      {/* Incoming Call Dialog */}
+      {incomingCall && (
+        <IncomingCallDialog
+          isOpen={!!incomingCall}
+          callerName={incomingCall.callerName}
+          onAccept={acceptCall}
+          onDecline={declineCall}
+        />
+      )}
+
+      {/* Active Call Interface */}
+      {activeCall && otherUserId && (
+        <CallInterface
+          callId={activeCall.id}
+          isInitiator={activeCall.isInitiator}
+          otherUserId={otherUserId}
+          otherUserName={conversationName}
+          onCallEnd={() => setActiveCall(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="p-4 border-b flex items-center gap-3">
-        {conversation.is_group ? (
+        {conversation?.is_group ? (
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
             <Users className="h-5 w-5 text-primary" />
           </div>
@@ -310,12 +458,17 @@ export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => 
             <AvatarFallback>{getInitials(conversationName)}</AvatarFallback>
           </Avatar>
         )}
-        <div>
+        <div className="flex-1">
           <h2 className="font-semibold">{conversationName}</h2>
-          {conversation.is_group && (
+          {conversation?.is_group && (
             <p className="text-xs text-muted-foreground">Group chat</p>
           )}
         </div>
+        {!conversation?.is_group && (
+          <Button size="icon" variant="ghost" onClick={startCall}>
+            <Phone className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       {/* Messages */}

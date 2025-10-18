@@ -14,6 +14,85 @@ export type Database = {
   }
   public: {
     Tables: {
+      call_signals: {
+        Row: {
+          call_id: string
+          created_at: string
+          from_user_id: string
+          id: string
+          signal_data: Json
+          signal_type: string
+          to_user_id: string
+        }
+        Insert: {
+          call_id: string
+          created_at?: string
+          from_user_id: string
+          id?: string
+          signal_data: Json
+          signal_type: string
+          to_user_id: string
+        }
+        Update: {
+          call_id?: string
+          created_at?: string
+          from_user_id?: string
+          id?: string
+          signal_data?: Json
+          signal_type?: string
+          to_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_signals_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calls: {
+        Row: {
+          caller_id: string
+          conversation_id: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          receiver_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          caller_id: string
+          conversation_id: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          receiver_id: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          caller_id?: string
+          conversation_id?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          receiver_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calls_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       channel_members: {
         Row: {
           channel_id: string

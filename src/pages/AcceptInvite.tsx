@@ -34,25 +34,29 @@ export default function AcceptInvite() {
       // Fetch invite details
       const { data: inviteData, error: inviteError } = await supabase
         .from("workspace_invites")
-        .select(`
-          id,
-          workspace_id,
-          email,
-          expires_at,
-          status,
-          workspaces (
-            name,
-            slug
-          )
-        `)
+        .select("id, workspace_id, email, expires_at, status")
         .eq("token", token)
         .maybeSingle();
 
       if (inviteError || !inviteData) {
+        console.error("Invite fetch error:", inviteError);
         setError("Invitation not found");
         setLoading(false);
         return;
       }
+
+      // Fetch workspace details separately
+      const { data: workspaceData } = await supabase
+        .from("workspaces")
+        .select("name, slug")
+        .eq("id", inviteData.workspace_id)
+        .maybeSingle();
+
+      // Combine the data
+      const completeInvite = {
+        ...inviteData,
+        workspaces: workspaceData || { name: "Unknown Workspace", slug: "" }
+      };
 
       // Check if invite is expired
       if (new Date(inviteData.expires_at) < new Date()) {
@@ -62,17 +66,17 @@ export default function AcceptInvite() {
       }
 
       // Check if already accepted
-      if (inviteData.status === "accepted") {
+      if (completeInvite.status === "accepted") {
         setError("This invitation has already been used");
         setLoading(false);
         return;
       }
 
-      setInvite(inviteData);
+      setInvite(completeInvite);
 
       // If user is authenticated and email matches, auto-accept
-      if (user && user.email === inviteData.email) {
-        await acceptInvite(inviteData);
+      if (user && user.email === completeInvite.email) {
+        await acceptInvite(completeInvite);
       }
 
       setLoading(false);

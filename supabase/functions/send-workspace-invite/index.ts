@@ -13,7 +13,7 @@ const corsHeaders = {
 
 // Brevo sender configuration (set these in secrets for best deliverability)
 const brevoSenderName = Deno.env.get("BREVO_SENDER_NAME") || "Workspace Invites";
-const brevoSenderEmail = Deno.env.get("BREVO_SENDER_EMAIL") || "noreply@yourdomain.com";
+const brevoSenderEmail = Deno.env.get("BREVO_SENDER_EMAIL") || "melcat648@gmail.com";
 
 interface InviteRequest {
   workspaceId: string;

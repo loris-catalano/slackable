@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Hash, Plus, LogOut, User } from "lucide-react";
+import { Hash, Plus, LogOut } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ShareWorkspaceDialog } from "@/components/workspace/ShareWorkspaceDialog";
+import { QuickProfileCard } from "@/components/profile/QuickProfileCard";
 
 interface Channel {
   id: string;
@@ -197,11 +198,8 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
       </ScrollArea>
 
       <div className="border-t border-sidebar-border p-4 space-y-2">
-        <div className="flex items-center space-x-2 text-sm">
-          <User className="h-4 w-4" />
-          <span className="truncate">{profile?.display_name || profile?.email}</span>
-        </div>
-        <Button variant="ghost" size="sm" className="w-full" onClick={onLogout}>
+        <QuickProfileCard />
+        <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign Out
         </Button>

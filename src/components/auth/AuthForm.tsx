@@ -51,7 +51,7 @@ export const AuthForm = () => {
   return (
     <div className="w-full max-w-md space-y-6 rounded-lg border bg-card p-8 shadow-lg">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">Welcome to Slack Clone</h1>
+        <h1 className="text-3xl font-bold">Welcome to Stackable</h1>
         <p className="text-muted-foreground">
           {isSignUp ? "Create your account" : "Sign in to your workspace"}
         </p>

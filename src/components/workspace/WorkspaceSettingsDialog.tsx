@@ -33,10 +33,7 @@ export const WorkspaceSettingsDialog = ({
 
     setIsUpdating(true);
     try {
-      const { error } = await supabase
-        .from("workspaces")
-        .update({ name: newName.trim() })
-        .eq("id", workspaceId);
+      const { error } = await supabase.from("workspaces").update({ name: newName.trim() }).eq("id", workspaceId);
 
       if (error) throw error;
 
@@ -59,7 +56,9 @@ export const WorkspaceSettingsDialog = ({
         <Tabs defaultValue="general" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="general">General</TabsTrigger>
-            <TabsTrigger value="members" disabled>Members</TabsTrigger>
+            <TabsTrigger value="members" disabled>
+              Members Management
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="general" className="space-y-4 mt-4">
             <div className="space-y-2">
@@ -71,8 +70,8 @@ export const WorkspaceSettingsDialog = ({
                 placeholder="Enter workspace name"
               />
             </div>
-            <Button 
-              onClick={handleUpdateName} 
+            <Button
+              onClick={handleUpdateName}
               disabled={isUpdating || newName.trim() === workspaceName}
               className="w-full"
             >
@@ -80,9 +79,7 @@ export const WorkspaceSettingsDialog = ({
             </Button>
           </TabsContent>
           <TabsContent value="members" className="space-y-4 mt-4">
-            <p className="text-sm text-muted-foreground">
-              Member management coming soon...
-            </p>
+            <p className="text-sm text-muted-foreground">Member management coming soon...</p>
           </TabsContent>
         </Tabs>
       </DialogContent>

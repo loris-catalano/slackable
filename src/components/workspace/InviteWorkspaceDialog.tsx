@@ -108,7 +108,7 @@ export const InviteWorkspaceDialog = ({ workspaceId, workspaceName }: InviteWork
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" size="sm">
+        <Button variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90">
           <UserPlus className="h-4 w-4 mr-2" />
           Invite Members
         </Button>

@@ -213,6 +213,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_workspace: {
+        Args: { _name: string; _slug: string; _user_id: string }
+        Returns: string
+      }
       is_channel_member: {
         Args: { _channel_id: string; _user_id: string }
         Returns: boolean

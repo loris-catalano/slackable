@@ -54,7 +54,7 @@ export const EditProfileDialog = ({ profile, onUpdate }: EditProfileDialogProps)
     status_emoji: profile.status_emoji || "",
     status_text: profile.status_text || "",
     timezone: profile.timezone || "UTC",
-    status: profile.status || "active",
+    status: profile.status || "online",
   });
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -300,7 +300,7 @@ export const EditProfileDialog = ({ profile, onUpdate }: EditProfileDialogProps)
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">🟢 Active</SelectItem>
+                <SelectItem value="online">🟢 Online</SelectItem>
                 <SelectItem value="away">🟡 Away</SelectItem>
                 <SelectItem value="offline">⚫ Offline</SelectItem>
               </SelectContent>

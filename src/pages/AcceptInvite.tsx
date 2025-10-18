@@ -140,6 +140,30 @@ export default function AcceptInvite() {
         return;
       }
 
+      // Get all public channels in the workspace
+      const { data: publicChannels } = await supabase
+        .from("channels")
+        .select("id")
+        .eq("workspace_id", inviteToAccept.workspace_id)
+        .eq("is_private", false);
+
+      // Add user to all public channels
+      if (publicChannels && publicChannels.length > 0) {
+        const channelMemberships = publicChannels.map(channel => ({
+          channel_id: channel.id,
+          user_id: user.id,
+        }));
+
+        const { error: channelError } = await supabase
+          .from("channel_members")
+          .insert(channelMemberships);
+
+        if (channelError) {
+          console.error("Error adding to channels:", channelError);
+          // Don't fail the whole process if channel addition fails
+        }
+      }
+
       // Mark invite as accepted
       await supabase
         .from("workspace_invites")

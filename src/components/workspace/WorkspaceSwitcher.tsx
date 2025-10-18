@@ -106,7 +106,11 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
             <DropdownMenuItem
               key={workspace.id}
               onClick={() => handleSwitchWorkspace(workspace.id)}
-              className={currentWorkspaceId === workspace.id ? "bg-accent" : ""}
+              className={
+                currentWorkspaceId === workspace.id 
+                  ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" 
+                  : "bg-background text-foreground hover:bg-primary hover:text-primary-foreground"
+              }
             >
               <div className="flex flex-col flex-1">
                 <div className="flex items-center gap-2">
@@ -115,7 +119,7 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
                     <Badge variant="secondary" className="text-xs">Owner</Badge>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground">{workspace.slug}</span>
+                <span className="text-xs opacity-70">{workspace.slug}</span>
               </div>
             </DropdownMenuItem>
           ))}

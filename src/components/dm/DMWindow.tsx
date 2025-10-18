@@ -250,14 +250,14 @@ export const DMWindow = ({ conversationId }: DMWindowProps) => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
-          <div key={message.id} className="flex gap-3">
-            <Avatar className="h-8 w-8">
+          <div key={message.id} className="flex gap-3 items-start">
+            <Avatar className="h-8 w-8 flex-shrink-0">
               <AvatarImage src={message.profiles.avatar_url || undefined} />
               <AvatarFallback>
                 {getInitials(message.profiles.display_name)}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="font-semibold text-sm">
                   {message.profiles.display_name}
@@ -266,7 +266,7 @@ export const DMWindow = ({ conversationId }: DMWindowProps) => {
                   {format(new Date(message.created_at), "h:mm a")}
                 </span>
               </div>
-              <p className="text-sm mt-1 break-words">{message.content}</p>
+              <p className="text-sm mt-1 break-words whitespace-pre-wrap">{message.content}</p>
             </div>
           </div>
         ))}

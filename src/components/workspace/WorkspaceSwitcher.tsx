@@ -208,10 +208,33 @@ export const WorkspaceSwitcher = ({ currentWorkspaceName }: WorkspaceSwitcherPro
           workspaceId={leaveWorkspaceId}
           workspaceName={leaveWorkspaceName}
           onWorkspaceLeft={async () => {
+            setLeaveWorkspaceId(null);
+            
+            // Reload workspaces to get updated list
             await loadWorkspaces();
-            // If leaving current workspace, redirect
-            if (leaveWorkspaceId === currentWorkspaceId) {
-              window.location.href = "/";
+            
+            // Check if user still has workspaces
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              const { data: remainingWorkspaces } = await supabase
+                .from("workspace_members")
+                .select("workspace_id, workspaces(id, name)")
+                .eq("user_id", user.id);
+
+              if (!remainingWorkspaces || remainingWorkspaces.length === 0) {
+                // No workspaces left, redirect to home (will show WorkspaceSelector)
+                setCurrentWorkspaceId(null);
+                window.location.href = "/";
+              } else if (leaveWorkspaceId === currentWorkspaceId) {
+                // Left current workspace, switch to first available
+                setIsTransitioning(true);
+                const firstWorkspace = remainingWorkspaces[0].workspaces;
+                if (firstWorkspace) {
+                  setCurrentWorkspaceId(firstWorkspace.id);
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                setIsTransitioning(false);
+              }
             }
           }}
         />

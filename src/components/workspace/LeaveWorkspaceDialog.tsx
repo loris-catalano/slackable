@@ -38,16 +38,7 @@ export const LeaveWorkspaceDialog = ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("No user found");
 
-      // Remove user from workspace
-      const { error: memberError } = await supabase
-        .from("workspace_members")
-        .delete()
-        .eq("workspace_id", workspaceId)
-        .eq("user_id", user.id);
-
-      if (memberError) throw memberError;
-
-      // Remove user from all channels in the workspace
+      // Remove user from all channels in the workspace first
       const { data: channels } = await supabase
         .from("channels")
         .select("id")
@@ -63,15 +54,21 @@ export const LeaveWorkspaceDialog = ({
         if (channelError) console.error("Error removing from channels:", channelError);
       }
 
+      // Remove user from workspace
+      const { error: memberError } = await supabase
+        .from("workspace_members")
+        .delete()
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", user.id);
+
+      if (memberError) throw memberError;
+
       toast.success(`Left ${workspaceName} successfully`);
       onOpenChange(false);
       
+      // Always use callback to handle post-leave logic
       if (onWorkspaceLeft) {
         onWorkspaceLeft();
-      } else {
-        // Navigate to home if no callback provided
-        navigate("/");
-        window.location.reload();
       }
     } catch (error: any) {
       console.error("Error leaving workspace:", error);

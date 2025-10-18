@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { ShareWorkspaceDialog } from "@/components/workspace/ShareWorkspaceDialog";
 
 interface Channel {
   id: string;
@@ -32,10 +33,12 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newChannelName, setNewChannelName] = useState("");
   const [newChannelDesc, setNewChannelDesc] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
 
   useEffect(() => {
     fetchChannels();
     fetchProfile();
+    fetchWorkspaceName();
     subscribeToChannels();
   }, [workspaceId]);
 
@@ -60,6 +63,16 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
       .single();
 
     if (data) setProfile(data);
+  };
+
+  const fetchWorkspaceName = async () => {
+    const { data } = await supabase
+      .from("workspaces")
+      .select("name")
+      .eq("id", workspaceId)
+      .single();
+
+    if (data) setWorkspaceName(data.name);
   };
 
   const subscribeToChannels = () => {
@@ -120,8 +133,9 @@ export const Sidebar = ({ workspaceId, currentChannelId, onSelectChannel, onLogo
 
   return (
     <div className="flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="border-b border-sidebar-border p-4">
-        <h2 className="text-lg font-semibold">Workspace</h2>
+      <div className="border-b border-sidebar-border p-4 space-y-2">
+        <h2 className="text-lg font-semibold">{workspaceName || "Workspace"}</h2>
+        <ShareWorkspaceDialog workspaceId={workspaceId} workspaceName={workspaceName} />
       </div>
 
       <ScrollArea className="flex-1">

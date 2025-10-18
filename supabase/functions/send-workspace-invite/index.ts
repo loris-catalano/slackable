@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const brevoApiKey = Deno.env.get("BREVO_API_KEY")!;
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -249,7 +249,11 @@ const handler = async (req: Request): Promise<Response> => {
         results.push({ email, success: true });
       } catch (error) {
         console.error(`Error processing invite for ${email}:`, error);
-        results.push({ email, success: false, error: error.message });
+        results.push({ 
+          email, 
+          success: false, 
+          error: error instanceof Error ? error.message : "Unknown error" 
+        });
       }
     }
 

@@ -70,14 +70,7 @@ export const ChannelDetailsDrawer = ({
     setLoading(true);
     const { data, error } = await supabase
       .from("channels")
-      .select(`
-        name,
-        description,
-        created_at,
-        created_by,
-        is_private,
-        profiles!channels_created_by_fkey(display_name)
-      `)
+      .select("name, description, created_at, created_by, is_private")
       .eq("id", channelId)
       .single();
 
@@ -88,13 +81,20 @@ export const ChannelDetailsDrawer = ({
     }
 
     if (data) {
+      // Fetch creator profile separately
+      const { data: creatorProfile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", data.created_by)
+        .single();
+
       const channelData: ChannelData = {
         name: data.name,
         description: data.description,
         created_at: data.created_at,
         created_by: data.created_by,
         is_private: data.is_private,
-        creator_name: (data.profiles as any)?.display_name || "Unknown",
+        creator_name: creatorProfile?.display_name || "Unknown",
       };
       setChannel(channelData);
       setEditName(data.name);
@@ -107,11 +107,7 @@ export const ChannelDetailsDrawer = ({
   const fetchMembers = async () => {
     const { data, error } = await supabase
       .from("channel_members")
-      .select(`
-        id,
-        user_id,
-        profiles!channel_members_user_id_fkey(display_name, avatar_url)
-      `)
+      .select("id, user_id")
       .eq("channel_id", channelId);
 
     if (error) {
@@ -121,13 +117,23 @@ export const ChannelDetailsDrawer = ({
     }
 
     if (data) {
-      const membersData: Member[] = data.map((m: any) => ({
-        id: m.id,
-        user_id: m.user_id,
-        display_name: m.profiles?.display_name || "Unknown",
-        avatar_url: m.profiles?.avatar_url || null,
-        role: "member",
-      }));
+      // Fetch profiles for all members
+      const userIds = data.map((m) => m.user_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .in("id", userIds);
+
+      const membersData: Member[] = data.map((m) => {
+        const profile = profiles?.find((p) => p.id === m.user_id);
+        return {
+          id: m.id,
+          user_id: m.user_id,
+          display_name: profile?.display_name || "Unknown",
+          avatar_url: profile?.avatar_url || null,
+          role: "member",
+        };
+      });
       setMembers(membersData);
     }
   };

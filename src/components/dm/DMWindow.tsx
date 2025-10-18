@@ -83,31 +83,40 @@ export const DMWindow = ({ conversationId }: DMWindowProps) => {
 
       setCurrentUserId(user.id);
 
-      const { data: convData, error } = await supabase
+      // Get conversation details
+      const { data: convData, error: convError } = await supabase
         .from("conversations")
-        .select(`
-          id,
-          name,
-          is_group,
-          conversation_members!inner(
-            profiles(id, display_name, avatar_url)
-          )
-        `)
+        .select("id, name, is_group")
         .eq("id", conversationId)
         .single();
 
-      if (error) throw error;
+      if (convError) throw convError;
 
-      setConversation(convData as any);
+      setConversation(convData);
+
+      // Get conversation members
+      const { data: membersData, error: membersError } = await supabase
+        .from("conversation_members")
+        .select("user_id")
+        .eq("conversation_id", conversationId);
+
+      if (membersError) throw membersError;
 
       // Set conversation name
       if (convData.is_group) {
         setConversationName(convData.name || "Group Chat");
       } else {
-        const otherMember = (convData as any).conversation_members.find(
-          (m: any) => m.profiles.id !== user.id
-        );
-        setConversationName(otherMember?.profiles.display_name || "Unknown User");
+        // For 1:1 chats, get the other user's profile
+        const otherUserId = membersData?.find(m => m.user_id !== user.id)?.user_id;
+        if (otherUserId) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("id", otherUserId)
+            .single();
+          
+          setConversationName(profileData?.display_name || "Unknown User");
+        }
       }
     } catch (error: any) {
       console.error("Error loading conversation:", error);
@@ -117,22 +126,34 @@ export const DMWindow = ({ conversationId }: DMWindowProps) => {
 
   const loadMessages = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: messagesData, error } = await supabase
         .from("direct_messages")
-        .select(`
-          id,
-          content,
-          user_id,
-          created_at,
-          edited,
-          profiles(id, display_name, avatar_url)
-        `)
+        .select("id, content, user_id, created_at, edited")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
 
       if (error) throw error;
 
-      setMessages(data as any || []);
+      // Get unique user IDs
+      const userIds = [...new Set(messagesData?.map(m => m.user_id) || [])];
+      
+      // Get profiles for all users
+      const { data: profilesData } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .in("id", userIds);
+
+      // Combine messages with profiles
+      const messagesWithProfiles = (messagesData || []).map(message => ({
+        ...message,
+        profiles: profilesData?.find(p => p.id === message.user_id) || {
+          id: message.user_id,
+          display_name: "Unknown User",
+          avatar_url: null
+        }
+      }));
+
+      setMessages(messagesWithProfiles as any);
     } catch (error: any) {
       console.error("Error loading messages:", error);
       toast.error("Failed to load messages");

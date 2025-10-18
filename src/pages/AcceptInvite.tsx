@@ -45,12 +45,25 @@ export default function AcceptInvite() {
         return;
       }
 
-      // Fetch workspace details separately
-      const { data: workspaceData } = await supabase
-        .from("workspaces")
-        .select("name, slug")
-        .eq("id", inviteData.workspace_id)
+      // Fetch workspace details using public access (RLS allows viewing by invite token)
+      // We'll get the workspace name from the invite join query instead
+      const { data: fullInviteData } = await supabase
+        .from("workspace_invites")
+        .select(`
+          id,
+          workspace_id,
+          email,
+          expires_at,
+          status,
+          workspaces (
+            name,
+            slug
+          )
+        `)
+        .eq("token", token)
         .maybeSingle();
+
+      const workspaceData = fullInviteData?.workspaces || { name: "Unknown Workspace", slug: "" };
 
       // Combine the data
       const completeInvite = {

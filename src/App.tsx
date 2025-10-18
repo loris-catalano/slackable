@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import JoinWorkspace from "./pages/JoinWorkspace";
 import AcceptInvite from "./pages/AcceptInvite";
 import Profile from "./pages/Profile";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/join/:workspaceId" element={<JoinWorkspace />} />
             <Route path="/invite/:token" element={<AcceptInvite />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

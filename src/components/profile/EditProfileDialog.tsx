@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Edit2, Loader2 } from "lucide-react";
+import { Edit2, Loader2, Upload, X } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -43,6 +44,9 @@ interface EditProfileDialogProps {
 export const EditProfileDialog = ({ profile, onUpdate }: EditProfileDialogProps) => {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     full_name: profile.full_name || "",
     display_name: profile.display_name || "",
@@ -52,6 +56,74 @@ export const EditProfileDialog = ({ profile, onUpdate }: EditProfileDialogProps)
     timezone: profile.timezone || "UTC",
     status: profile.status || "active",
   });
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size should be less than 2MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Delete old avatar if exists
+      if (avatarUrl) {
+        const oldPath = avatarUrl.split('/').slice(-2).join('/');
+        await supabase.storage.from('avatars').remove([oldPath]);
+      }
+
+      // Upload new avatar
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      setAvatarUrl(publicUrl);
+      toast.success('Avatar uploaded successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload avatar');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!avatarUrl) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const path = avatarUrl.split('/').slice(-2).join('/');
+      await supabase.storage.from('avatars').remove([path]);
+      
+      setAvatarUrl(null);
+      toast.success('Avatar removed');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove avatar');
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -66,6 +138,7 @@ export const EditProfileDialog = ({ profile, onUpdate }: EditProfileDialogProps)
           status_text: formData.status_text || null,
           timezone: formData.timezone,
           status: formData.status,
+          avatar_url: avatarUrl,
         })
         .eq("id", profile.id);
 
@@ -98,6 +171,61 @@ export const EditProfileDialog = ({ profile, onUpdate }: EditProfileDialogProps)
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Avatar Upload Section */}
+          <div className="space-y-2">
+            <Label>Profile Picture</Label>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={avatarUrl || undefined} />
+                <AvatarFallback className="text-lg">
+                  {formData.display_name?.[0]?.toUpperCase() || profile.email[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload
+                    </>
+                  )}
+                </Button>
+                {avatarUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRemoveAvatar}
+                  >
+                    <X className="mr-2 h-4 w-4" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Recommended: Square image, max 2MB
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="full_name">Full Name</Label>
             <Input

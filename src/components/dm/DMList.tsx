@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Users, MessageSquarePlus } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
 interface Conversation {
@@ -26,21 +27,31 @@ interface Conversation {
   }>;
 }
 
+interface WorkspaceMember {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  email: string;
+  has_conversation: boolean;
+}
+
 interface DMListProps {
   onSelectConversation: (conversationId: string) => void;
   onNewDM: () => void;
   selectedConversationId: string | null;
+  workspaceId: string;
 }
 
-export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId }: DMListProps) => {
+export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId, workspaceId }: DMListProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadConversations();
+    loadData();
     setupRealtimeSubscription();
-  }, []);
+  }, [workspaceId]);
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
@@ -53,7 +64,7 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId }
           table: 'direct_messages'
         },
         () => {
-          loadConversations();
+          loadData();
         }
       )
       .on(
@@ -64,7 +75,7 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId }
           table: 'conversations'
         },
         () => {
-          loadConversations();
+          loadData();
         }
       )
       .subscribe();
@@ -74,97 +85,209 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId }
     };
   };
 
-  const loadConversations = async () => {
+  const loadData = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       setCurrentUserId(user.id);
 
-      // Get all conversations user is part of
-      const { data: convData, error: convError } = await supabase
-        .from("conversations")
-        .select(`
-          id,
-          name,
-          is_group,
-          last_message_at,
-          conversation_members!inner(
-            user_id,
-            last_read_at,
-            profiles(id, display_name, avatar_url)
-          )
-        `)
-        .order("last_message_at", { ascending: false, nullsFirst: false });
-
-      if (convError) throw convError;
-
-      // Process conversations to add unread counts and user info
-      const processedConversations = await Promise.all(
-        (convData || []).map(async (conv: any) => {
-          // Get unread count
-          const { data: unreadData } = await supabase
-            .from("conversation_members")
-            .select("last_read_at")
-            .eq("conversation_id", conv.id)
-            .eq("user_id", user.id)
-            .single();
-
-          const lastReadAt = unreadData?.last_read_at;
-
-          let unreadCount = 0;
-          if (lastReadAt) {
-            const { count } = await supabase
-              .from("direct_messages")
-              .select("*", { count: 'exact', head: true })
-              .eq("conversation_id", conv.id)
-              .gt("created_at", lastReadAt)
-              .neq("user_id", user.id);
-
-            unreadCount = count || 0;
-          } else {
-            const { count } = await supabase
-              .from("direct_messages")
-              .select("*", { count: 'exact', head: true })
-              .eq("conversation_id", conv.id)
-              .neq("user_id", user.id);
-
-            unreadCount = count || 0;
-          }
-
-          // For 1:1 chats, get the other user
-          let otherUser;
-          if (!conv.is_group) {
-            const otherMember = conv.conversation_members.find(
-              (m: any) => m.user_id !== user.id
-            );
-            if (otherMember?.profiles) {
-              otherUser = {
-                id: otherMember.profiles.id,
-                display_name: otherMember.profiles.display_name,
-                avatar_url: otherMember.profiles.avatar_url
-              };
-            }
-          }
-
-          return {
-            id: conv.id,
-            name: conv.name,
-            is_group: conv.is_group,
-            last_message_at: conv.last_message_at,
-            unread_count: unreadCount,
-            other_user: otherUser,
-            members: conv.conversation_members
-          };
-        })
-      );
-
-      setConversations(processedConversations);
+      // Load conversations and members in parallel
+      await Promise.all([loadConversations(user.id), loadWorkspaceMembers(user.id)]);
     } catch (error: any) {
-      console.error("Error loading conversations:", error);
+      console.error("Error loading data:", error);
       toast.error("Failed to load conversations");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadConversations = async (userId: string) => {
+    // Get all conversations user is part of
+    const { data: convData, error: convError } = await supabase
+      .from("conversations")
+      .select(`
+        id,
+        name,
+        is_group,
+        last_message_at,
+        conversation_members!inner(
+          user_id,
+          last_read_at,
+          profiles(id, display_name, avatar_url)
+        )
+      `)
+      .order("last_message_at", { ascending: false, nullsFirst: false });
+
+    if (convError) throw convError;
+
+    // Process conversations to add unread counts and user info
+    const processedConversations = await Promise.all(
+      (convData || []).map(async (conv: any) => {
+        // Get unread count
+        const { data: unreadData } = await supabase
+          .from("conversation_members")
+          .select("last_read_at")
+          .eq("conversation_id", conv.id)
+          .eq("user_id", userId)
+          .single();
+
+        const lastReadAt = unreadData?.last_read_at;
+
+        let unreadCount = 0;
+        if (lastReadAt) {
+          const { count } = await supabase
+            .from("direct_messages")
+            .select("*", { count: 'exact', head: true })
+            .eq("conversation_id", conv.id)
+            .gt("created_at", lastReadAt)
+            .neq("user_id", userId);
+
+          unreadCount = count || 0;
+        } else {
+          const { count } = await supabase
+            .from("direct_messages")
+            .select("*", { count: 'exact', head: true })
+            .eq("conversation_id", conv.id)
+            .neq("user_id", userId);
+
+          unreadCount = count || 0;
+        }
+
+        // For 1:1 chats, get the other user
+        let otherUser;
+        if (!conv.is_group) {
+          const otherMember = conv.conversation_members.find(
+            (m: any) => m.user_id !== userId
+          );
+          if (otherMember?.profiles) {
+            otherUser = {
+              id: otherMember.profiles.id,
+              display_name: otherMember.profiles.display_name,
+              avatar_url: otherMember.profiles.avatar_url
+            };
+          }
+        }
+
+        return {
+          id: conv.id,
+          name: conv.name,
+          is_group: conv.is_group,
+          last_message_at: conv.last_message_at,
+          unread_count: unreadCount,
+          other_user: otherUser,
+          members: conv.conversation_members
+        };
+      })
+    );
+
+    setConversations(processedConversations);
+  };
+
+  const loadWorkspaceMembers = async (userId: string) => {
+    // Get all workspace members except current user
+    const { data: membersData, error } = await supabase
+      .from("workspace_members")
+      .select(`
+        user_id,
+        profiles(id, display_name, avatar_url, email)
+      `)
+      .eq("workspace_id", workspaceId)
+      .neq("user_id", userId);
+
+    if (error) throw error;
+
+    // Get all 1:1 conversation user IDs
+    const { data: existingConvs } = await supabase
+      .from("conversation_members")
+      .select("conversation_id")
+      .eq("user_id", userId);
+
+    const conversationUserIds = new Set<string>();
+    
+    if (existingConvs) {
+      for (const conv of existingConvs) {
+        const { data: members } = await supabase
+          .from("conversation_members")
+          .select("user_id, conversations!inner(is_group)")
+          .eq("conversation_id", conv.conversation_id);
+
+        if (members && members.length === 2) {
+          const otherMember = members.find(m => m.user_id !== userId);
+          if (otherMember) {
+            conversationUserIds.add(otherMember.user_id);
+          }
+        }
+      }
+    }
+
+    const membersList = membersData
+      ?.map((m: any) => ({
+        id: m.profiles.id,
+        display_name: m.profiles.display_name,
+        avatar_url: m.profiles.avatar_url,
+        email: m.profiles.email,
+        has_conversation: conversationUserIds.has(m.profiles.id)
+      }))
+      .filter(Boolean) as WorkspaceMember[];
+
+    setMembers(membersList || []);
+  };
+
+  const startDirectMessage = async (memberId: string) => {
+    if (!currentUserId) return;
+
+    try {
+      // Check if conversation already exists
+      const { data: existingConvs } = await supabase
+        .from("conversation_members")
+        .select("conversation_id")
+        .eq("user_id", currentUserId);
+
+      if (existingConvs) {
+        for (const conv of existingConvs) {
+          const { data: members } = await supabase
+            .from("conversation_members")
+            .select("user_id, conversations!inner(is_group)")
+            .eq("conversation_id", conv.conversation_id);
+
+          if (
+            members &&
+            members.length === 2 &&
+            members.some(m => m.user_id === memberId)
+          ) {
+            onSelectConversation(conv.conversation_id);
+            return;
+          }
+        }
+      }
+
+      // Create new conversation
+      const { data: conversation, error: convError } = await supabase
+        .from("conversations")
+        .insert({
+          is_group: false,
+          created_by: currentUserId
+        })
+        .select()
+        .single();
+
+      if (convError) throw convError;
+
+      // Add members
+      const { error: memberError } = await supabase
+        .from("conversation_members")
+        .insert([
+          { conversation_id: conversation.id, user_id: currentUserId },
+          { conversation_id: conversation.id, user_id: memberId }
+        ]);
+
+      if (memberError) throw memberError;
+
+      onSelectConversation(conversation.id);
+    } catch (error: any) {
+      console.error("Error starting DM:", error);
+      toast.error("Failed to start conversation");
     }
   };
 
@@ -195,61 +318,101 @@ export const DMList = ({ onSelectConversation, onNewDM, selectedConversationId }
     return <div className="p-4 text-muted-foreground">Loading...</div>;
   }
 
+  const activeConversations = conversations.filter(c => c.last_message_at);
+  const membersWithoutConversation = members.filter(m => !m.has_conversation);
+
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b flex items-center justify-between">
         <h2 className="font-semibold text-lg">Direct Messages</h2>
-        <Button onClick={onNewDM} size="icon" variant="ghost">
+        <Button onClick={onNewDM} size="icon" variant="ghost" title="New group chat">
           <MessageSquarePlus className="h-5 w-5" />
         </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {conversations.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground">
-            No conversations yet. Start a new DM!
-          </div>
-        ) : (
-          conversations.map((conv) => (
-            <button
-              key={conv.id}
-              onClick={() => onSelectConversation(conv.id)}
-              className={`w-full p-3 flex items-center gap-3 hover:bg-accent transition-colors ${
-                selectedConversationId === conv.id ? "bg-accent" : ""
-              }`}
-            >
-              {conv.is_group ? (
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-              ) : (
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={getConversationAvatar(conv) || undefined} />
-                  <AvatarFallback>
-                    {getInitials(getConversationName(conv))}
-                  </AvatarFallback>
-                </Avatar>
-              )}
+        {/* Active Conversations */}
+        {activeConversations.length > 0 && (
+          <>
+            <div className="px-4 py-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase">Messages</h3>
+            </div>
+            {activeConversations.map((conv) => (
+              <button
+                key={conv.id}
+                onClick={() => onSelectConversation(conv.id)}
+                className={`w-full p-3 flex items-center gap-3 hover:bg-accent transition-colors ${
+                  selectedConversationId === conv.id ? "bg-accent" : ""
+                }`}
+              >
+                {conv.is_group ? (
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-primary" />
+                  </div>
+                ) : (
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={getConversationAvatar(conv) || undefined} />
+                    <AvatarFallback>
+                      {getInitials(getConversationName(conv))}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
 
-              <div className="flex-1 text-left min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium truncate">
-                    {getConversationName(conv)}
-                  </span>
-                  {conv.unread_count && conv.unread_count > 0 && (
-                    <Badge variant="default" className="h-5 min-w-5 px-1.5">
-                      {conv.unread_count}
-                    </Badge>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium truncate">
+                      {getConversationName(conv)}
+                    </span>
+                    {conv.unread_count && conv.unread_count > 0 && (
+                      <Badge variant="default" className="h-5 min-w-5 px-1.5">
+                        {conv.unread_count}
+                      </Badge>
+                    )}
+                  </div>
+                  {conv.is_group && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {conv.members?.length || 0} members
+                    </p>
                   )}
                 </div>
-                {conv.is_group && (
-                  <p className="text-xs text-muted-foreground truncate">
-                    {conv.members?.length || 0} members
-                  </p>
-                )}
-              </div>
-            </button>
-          ))
+              </button>
+            ))}
+          </>
+        )}
+
+        {/* All Workspace Members */}
+        {members.length > 0 && (
+          <>
+            {activeConversations.length > 0 && <Separator className="my-2" />}
+            <div className="px-4 py-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase">Workspace Members</h3>
+            </div>
+            {members.map((member) => (
+              <button
+                key={member.id}
+                onClick={() => startDirectMessage(member.id)}
+                className="w-full p-3 flex items-center gap-3 hover:bg-accent transition-colors"
+              >
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={member.avatar_url || undefined} />
+                  <AvatarFallback>
+                    {getInitials(member.display_name)}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 text-left min-w-0">
+                  <p className="font-medium truncate">{member.display_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{member.email}</p>
+                </div>
+              </button>
+            ))}
+          </>
+        )}
+
+        {conversations.length === 0 && members.length === 0 && (
+          <div className="p-4 text-center text-muted-foreground">
+            No workspace members found.
+          </div>
         )}
       </div>
     </div>

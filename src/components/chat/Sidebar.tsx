@@ -243,6 +243,7 @@ export const Sidebar = ({ workspaceId, currentChannelId, currentConversationId, 
             onSelectConversation={onSelectConversation}
             onNewDM={() => setIsNewDMOpen(true)}
             selectedConversationId={currentConversationId}
+            workspaceId={workspaceId}
           />
         </TabsContent>
       </Tabs>

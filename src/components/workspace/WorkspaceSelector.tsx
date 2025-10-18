@@ -1,0 +1,155 @@
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { Plus } from "lucide-react";
+
+interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+interface WorkspaceSelectorProps {
+  onSelectWorkspace: (workspaceId: string) => void;
+}
+
+export const WorkspaceSelector = ({ onSelectWorkspace }: WorkspaceSelectorProps) => {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => {
+    fetchWorkspaces();
+  }, []);
+
+  const fetchWorkspaces = async () => {
+    const { data, error } = await supabase
+      .from("workspaces")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      toast.error("Failed to load workspaces");
+      return;
+    }
+
+    setWorkspaces(data || []);
+  };
+
+  const createWorkspace = async () => {
+    if (!newWorkspaceName.trim()) return;
+
+    setIsCreating(true);
+    try {
+      const slug = newWorkspaceName.toLowerCase().replace(/\s+/g, "-");
+      const { data: workspace, error: workspaceError } = await supabase
+        .from("workspaces")
+        .insert({ name: newWorkspaceName, slug })
+        .select()
+        .single();
+
+      if (workspaceError) throw workspaceError;
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user found");
+
+      const { error: memberError } = await supabase
+        .from("workspace_members")
+        .insert({
+          workspace_id: workspace.id,
+          user_id: user.id,
+          role: "admin",
+        });
+
+      if (memberError) throw memberError;
+
+      const { data: channel, error: channelError } = await supabase
+        .from("channels")
+        .insert({
+          workspace_id: workspace.id,
+          name: "general",
+          description: "General discussion",
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (channelError) throw channelError;
+
+      await supabase.from("channel_members").insert({
+        channel_id: channel.id,
+        user_id: user.id,
+      });
+
+      toast.success("Workspace created!");
+      setIsDialogOpen(false);
+      setNewWorkspaceName("");
+      fetchWorkspaces();
+      onSelectWorkspace(workspace.id);
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-muted p-4">
+      <div className="w-full max-w-2xl space-y-6 rounded-lg border bg-card p-8 shadow-lg">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold">Select a Workspace</h1>
+          <p className="text-muted-foreground">Choose a workspace to get started</p>
+        </div>
+
+        <div className="grid gap-3">
+          {workspaces.map((workspace) => (
+            <Button
+              key={workspace.id}
+              variant="outline"
+              className="h-auto justify-start p-4 text-left"
+              onClick={() => onSelectWorkspace(workspace.id)}
+            >
+              <div>
+                <div className="font-semibold">{workspace.name}</div>
+                <div className="text-sm text-muted-foreground">{workspace.slug}</div>
+              </div>
+            </Button>
+          ))}
+        </div>
+
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="w-full" variant="default">
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Workspace
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Workspace</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="workspace-name">Workspace Name</Label>
+                <Input
+                  id="workspace-name"
+                  placeholder="My Team Workspace"
+                  value={newWorkspaceName}
+                  onChange={(e) => setNewWorkspaceName(e.target.value)}
+                />
+              </div>
+              <Button onClick={createWorkspace} disabled={isCreating} className="w-full">
+                {isCreating ? "Creating..." : "Create Workspace"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+};

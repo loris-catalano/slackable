@@ -20,9 +20,10 @@ interface Channel {
 
 interface ChatWindowProps {
   channelId: string;
+  targetMessageId?: string | null;
 }
 
-export const ChatWindow = ({ channelId }: ChatWindowProps) => {
+export const ChatWindow = ({ channelId, targetMessageId }: ChatWindowProps) => {
   const [channel, setChannel] = useState<Channel | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [membershipReady, setMembershipReady] = useState(false);
@@ -117,7 +118,7 @@ export const ChatWindow = ({ channelId }: ChatWindowProps) => {
           </DropdownMenu>
         </div>
       </div>
-      {membershipReady && <MessageList channelId={channelId} />}
+      {membershipReady && <MessageList channelId={channelId} targetMessageId={targetMessageId} />}
       {membershipReady && <MessageInput channelId={channelId} />}
       <ChannelDetailsDrawer
         channelId={channelId}

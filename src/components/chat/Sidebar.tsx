@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Hash, Plus, LogOut, MessageSquare } from "lucide-react";
+import { Hash, Plus, LogOut, MessageSquare, Search } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,8 @@ import { QuickProfileCard } from "@/components/profile/QuickProfileCard";
 import { WorkspaceSwitcher } from "@/components/workspace/WorkspaceSwitcher";
 import { DMList } from "@/components/dm/DMList";
 import { NewDMDialog } from "@/components/dm/NewDMDialog";
+import { GlobalSearch } from "@/components/search/GlobalSearch";
+import { useNavigate } from "react-router-dom";
 
 interface Channel {
   id: string;
@@ -43,6 +45,15 @@ export const Sidebar = ({ workspaceId, currentChannelId, currentConversationId, 
   const [workspaceName, setWorkspaceName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isNewDMOpen, setIsNewDMOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSearchResult = (result: any) => {
+    if (result.type === "channel" && result.channel_id) {
+      navigate(`/?channel=${result.channel_id}&message=${result.id}`);
+    } else if (result.type === "dm" && result.conversation_id) {
+      navigate(`/?conversation=${result.conversation_id}&message=${result.id}`);
+    }
+  };
 
   useEffect(() => {
     setIsLoading(true);
@@ -159,14 +170,18 @@ export const Sidebar = ({ workspaceId, currentChannelId, currentConversationId, 
       </div>
 
       <Tabs defaultValue="channels" className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-2">
-          <TabsTrigger value="channels" className="flex-1">
+        <TabsList className="mx-4 mt-2 grid grid-cols-3">
+          <TabsTrigger value="channels">
             <Hash className="mr-2 h-4 w-4" />
             Channels
           </TabsTrigger>
-          <TabsTrigger value="dms" className="flex-1">
+          <TabsTrigger value="dms">
             <MessageSquare className="mr-2 h-4 w-4" />
             DMs
+          </TabsTrigger>
+          <TabsTrigger value="search">
+            <Search className="mr-2 h-4 w-4" />
+            Search
           </TabsTrigger>
         </TabsList>
 
@@ -243,6 +258,13 @@ export const Sidebar = ({ workspaceId, currentChannelId, currentConversationId, 
             onSelectConversation={onSelectConversation}
             onNewDM={() => setIsNewDMOpen(true)}
             selectedConversationId={currentConversationId}
+            workspaceId={workspaceId}
+          />
+        </TabsContent>
+
+        <TabsContent value="search" className="flex-1 mt-0">
+          <GlobalSearch 
+            onSelectResult={handleSearchResult}
             workspaceId={workspaceId}
           />
         </TabsContent>

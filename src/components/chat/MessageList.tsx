@@ -18,12 +18,14 @@ interface Message {
 
 interface MessageListProps {
   channelId: string;
+  targetMessageId?: string | null;
 }
 
-export const MessageList = ({ channelId }: MessageListProps) => {
+export const MessageList = ({ channelId, targetMessageId }: MessageListProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
     getCurrentUser();
@@ -42,8 +44,30 @@ export const MessageList = ({ channelId }: MessageListProps) => {
   }, [channelId]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (targetMessageId && messages.length > 0) {
+      scrollToTargetMessage();
+    } else {
+      scrollToBottom();
+    }
+  }, [messages, targetMessageId]);
+
+  const scrollToTargetMessage = () => {
+    if (targetMessageId && messageRefs.current[targetMessageId]) {
+      messageRefs.current[targetMessageId]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+      
+      // Highlight the message briefly
+      const element = messageRefs.current[targetMessageId];
+      if (element) {
+        element.classList.add("ring-2", "ring-primary", "ring-offset-2");
+        setTimeout(() => {
+          element.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+        }, 2000);
+      }
+    }
+  };
 
   const fetchMessages = async () => {
     const { data } = await supabase
@@ -117,7 +141,11 @@ export const MessageList = ({ channelId }: MessageListProps) => {
     <ScrollArea className="flex-1 p-4" ref={scrollRef}>
       <div className="space-y-4">
         {messages.map((message) => (
-          <div key={message.id} className="group hover:bg-muted/50 rounded p-2 -mx-2 transition-colors">
+          <div 
+            key={message.id} 
+            ref={(el) => messageRefs.current[message.id] = el}
+            className="group hover:bg-muted/50 rounded p-2 -mx-2 transition-colors"
+          >
             <div className="flex items-start space-x-3">
               <Avatar className="h-8 w-8 mt-0.5">
                 <AvatarImage src={message.user_avatar_url || undefined} />

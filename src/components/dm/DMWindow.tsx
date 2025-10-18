@@ -28,15 +28,17 @@ interface Conversation {
 
 interface DMWindowProps {
   conversationId: string;
+  targetMessageId?: string | null;
 }
 
-export const DMWindow = ({ conversationId }: DMWindowProps) => {
+export const DMWindow = ({ conversationId, targetMessageId }: DMWindowProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [conversationName, setConversationName] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   useEffect(() => {
     loadConversation();
@@ -50,8 +52,29 @@ export const DMWindow = ({ conversationId }: DMWindowProps) => {
   }, [conversationId]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (targetMessageId && messages.length > 0) {
+      scrollToTargetMessage();
+    } else {
+      scrollToBottom();
+    }
+  }, [messages, targetMessageId]);
+
+  const scrollToTargetMessage = () => {
+    if (targetMessageId && messageRefs.current[targetMessageId]) {
+      messageRefs.current[targetMessageId]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+      
+      const element = messageRefs.current[targetMessageId];
+      if (element) {
+        element.classList.add("ring-2", "ring-primary", "ring-offset-2");
+        setTimeout(() => {
+          element.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+        }, 2000);
+      }
+    }
+  };
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
@@ -250,7 +273,11 @@ export const DMWindow = ({ conversationId }: DMWindowProps) => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
-          <div key={message.id} className="flex gap-3 items-start">
+          <div 
+            key={message.id} 
+            ref={(el) => messageRefs.current[message.id] = el}
+            className="flex gap-3 items-start transition-colors"
+          >
             <Avatar className="h-8 w-8 flex-shrink-0">
               <AvatarImage src={message.profiles.avatar_url || undefined} />
               <AvatarFallback>

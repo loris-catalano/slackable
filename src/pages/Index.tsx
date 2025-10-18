@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { DMWindow } from "@/components/dm/DMWindow";
 import { User } from "@supabase/supabase-js";
+import { useSearchParams } from "react-router-dom";
 
 const Index = () => {
   const { currentWorkspaceId, setCurrentWorkspaceId, workspaces, isTransitioning } = useWorkspace();
@@ -17,6 +18,8 @@ const Index = () => {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [channelsLoading, setChannelsLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"channel" | "dm">("channel");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -65,6 +68,25 @@ const Index = () => {
       });
     }
   }, [currentWorkspaceId]);
+
+  // Handle URL parameters for navigation to specific messages
+  useEffect(() => {
+    const channelId = searchParams.get("channel");
+    const conversationId = searchParams.get("conversation");
+    const messageId = searchParams.get("message");
+
+    if (channelId) {
+      setCurrentChannelId(channelId);
+      setCurrentConversationId(null);
+      setViewMode("channel");
+      if (messageId) setTargetMessageId(messageId);
+    } else if (conversationId) {
+      setCurrentConversationId(conversationId);
+      setCurrentChannelId(null);
+      setViewMode("dm");
+      if (messageId) setTargetMessageId(messageId);
+    }
+  }, [searchParams]);
 
   const fetchDefaultChannel = async () => {
     if (!currentWorkspaceId) return;
@@ -151,9 +173,9 @@ const Index = () => {
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
       ) : viewMode === "channel" && currentChannelId ? (
-        <ChatWindow channelId={currentChannelId} />
+        <ChatWindow channelId={currentChannelId} targetMessageId={targetMessageId} />
       ) : viewMode === "dm" && currentConversationId ? (
-        <DMWindow conversationId={currentConversationId} />
+        <DMWindow conversationId={currentConversationId} targetMessageId={targetMessageId} />
       ) : (
         <div className="flex flex-1 items-center justify-center">
           <p className="text-muted-foreground">Select a channel or conversation to start messaging</p>
